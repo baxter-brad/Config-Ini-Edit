@@ -608,8 +608,8 @@ sub as_string {
                 # if name was in quotes
                 if( $nq ) {
                     $name = $nq eq '"' ?
-	       as_double_quoted( $name, '"', $escape ) :
-	       as_single_quoted( $name, "'" );
+                        as_double_quoted( $name, '"', $escape ) :
+                        as_single_quoted( $name, "'" );
                 }
 
                 # need heredoc if:
@@ -625,15 +625,15 @@ sub as_string {
                     $value = objToJson($value)."\n" if $json;
                     $output .= "$name$equals" .
                         as_heredoc(
-	           value     => $value,
-	           heretag   => $tag,
-	           quote     => $q,
-	           escape    => $escape,
-	           indented  => $indented,
-	           extra     => "$json$extra",
-	           comment   => $comment,
-	           herestyle => $style||$heredoc_style,
-	           );
+                            value     => $value,
+                            heretag   => $tag,
+                            quote     => $q,
+                            escape    => $escape,
+                            indented  => $indented,
+                            extra     => "$json$extra",
+                            comment   => $comment,
+                            herestyle => $style||$heredoc_style,
+                            );
                 }
 
                 else {
@@ -644,9 +644,9 @@ sub as_string {
                         $q ? $q : $comment ? "'" : '';
                     $output .= "$name$equals" . (
                         $need_quotes eq '"'                          ?
-	           as_double_quoted( $value, '"', $escape ) :
+                            as_double_quoted( $value, '"', $escape ) :
                         $need_quotes                                 ?
-	           as_single_quoted( $value, "'" )          :
+                            as_single_quoted( $value, "'" )          :
                         $value );
                     $output .= "$comment\n";
                 }
