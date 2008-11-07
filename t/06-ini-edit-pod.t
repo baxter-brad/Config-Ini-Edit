@@ -2,10 +2,68 @@
 use warnings;
 use strict;
 
-use Test::More tests => 17;
+use Test::More tests => 19;
 use Config::Ini::Edit;
 
 # POD Examples
+
+Synopsis: {
+
+ my $out = '';
+
+ my $ini = Config::Ini::Edit->new( string => <<'__' );
+[section_1]
+name_1_1 = value_1_1
+name_1_2 = value_1_2
+[section_2]
+name_2_1 = value_2_1
+name_2_2 = value_2_2
+__
+
+ # traverse the values
+ for my $section ( $ini->get_sections() ) {
+     $out .= "$section\n";
+ 
+     for my $name ( $ini->get_names( $section ) ) {
+         $out .= "  $name\n";
+ 
+         for my $value ( $ini->get( $section, $name ) ) {
+             $out .= "    $value\n";
+         }
+     }
+ }
+ 
+  is( $out, <<'__', "Synopsis traverse" );
+section_1
+  name_1_1
+    value_1_1
+  name_1_2
+    value_1_2
+section_2
+  name_2_1
+    value_2_1
+  name_2_2
+    value_2_2
+__
+
+ use Carp;
+ # rewrite the file
+ my $inifile = $ini->file();
+ open INI, '>', \$out or croak "Can't open $inifile: $!";
+ print INI $ini->as_string();
+ close INI;
+
+  is( $out, <<'__', "Synopsis as_string()" );
+[section_1]
+name_1_1 = value_1_1
+name_1_2 = value_1_2
+
+[section_2]
+name_2_1 = value_2_1
+name_2_2 = value_2_2
+__
+
+}
 
 Terminology: {
 

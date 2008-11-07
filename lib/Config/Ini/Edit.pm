@@ -6,9 +6,18 @@ use strict;
 use warnings;
 use Carp;
 
+=begin html
+
+ <style type="text/css">
+ @import "http://dbsdev.galib.uga.edu/sitegen/css/sitegen.css";
+ body { margin: 1em; }
+ </style>
+
+=end html
+
 =head1 NAME
 
-Config::Ini::Edit - ini style configuration file reader/writer
+Config::Ini::Edit - Ini configuration file reader and writer
 
 =head1 SYNOPSIS
 
@@ -20,7 +29,7 @@ Config::Ini::Edit - ini style configuration file reader/writer
  for my $section ( $ini->get_sections() ) {
      print "$section\n";
  
-     for my $name ( $ini->get_names( $section ) {
+     for my $name ( $ini->get_names( $section ) ) {
          print "  $name\n";
  
          for my $value ( $ini->get( $section, $name ) ) {
@@ -31,19 +40,19 @@ Config::Ini::Edit - ini style configuration file reader/writer
  
  # rewrite the file
  my $inifile = $ini->file();
- open INI, '>', $inifile or die "Can't open $inifile: $!";
+ open INI, '>', $inifile or croak "Can't open $inifile: $!";
  print INI $ini->as_string();
  close INI;
 
 =head1 VERSION
 
-    VERSION: 0.10
+VERSION: 1.00
 
 =cut
 
 # more POD follows the __END__
 
-our $VERSION = '0.10';
+our $VERSION = '1.00';
 
 our @ISA = qw( Config::Ini );
 use Config::Ini;
@@ -130,10 +139,10 @@ use subs qw( file keep_comments heredoc_style );
 ## $ini->_autovivify( $section, $name )     see Config::Ini
 
 #---------------------------------------------------------------------
-## $ini->init( $file )            or
-## $ini->init( file   =>$file   ) or
-## $ini->init( fh     =>$fh     ) or
-## $ini->init( string =>$string )
+## $ini->init( $file )             or
+## $ini->init( file   => $file   ) or
+## $ini->init( fh     => $fh     ) or
+## $ini->init( string => $string )
 sub init {
     my ( $self, @parms ) = @_;
 
@@ -191,7 +200,7 @@ sub init {
         }
 
         # [section]
-        if( /^\[([^\]]+)\](\s*[#;].*\s*)?/ ) {
+        if( /^\[([^\]]*)\](\s*[#;].*\s*)?/ ) {
             $section = $1;
             my $comment = $2;
             $self->_autovivify( $section );
@@ -262,7 +271,7 @@ sub init {
 
             }  # while
 
-            die "Didn't find heredoc end tag ($heretag) " .
+            croak "Didn't find heredoc end tag ($heretag) " .
                 "for $section:$name" unless $found_end;
 
             # ':parse' enables ':chomp', too
@@ -381,6 +390,11 @@ sub get_comments {
     return unless defined $section and defined $name;
     $i = 0 unless defined $i;
 
+    # to avoid autoviv 
+    return unless
+        exists $self->[SHASH]{ $section } and
+        exists $self->[SHASH]{ $section }[NHASH]{ $name };
+
     my $aref = $self->[SHASH]{ $section }[NHASH]{ $name }[CMTS];
     return unless $aref;
     return $aref->[ $i ];
@@ -435,6 +449,9 @@ sub get_section_comments {
     my ( $self, $section ) = @_;
     return unless defined $section;
 
+    # to avoid autoviv 
+    return unless exists $self->[SHASH]{ $section };
+
     return $self->[SHASH]{ $section }[SCMTS][0]
         if $self->[SHASH]{ $section }[SCMTS];
 }
@@ -459,6 +476,9 @@ sub set_section_comments {
 sub get_section_comment {
     my ( $self, $section ) = @_;
     return unless defined $section;
+
+    # to avoid autoviv 
+    return unless exists $self->[SHASH]{ $section };
 
     return $self->[SHASH]{ $section }[SCMTS][1]
         if $self->[SHASH]{ $section }[SCMTS];
@@ -491,6 +511,10 @@ sub vattr {
 
     # return all attributes
     unless( @parms ) {
+        # to avoid autoviv 
+        return unless
+            exists $self->[SHASH]{ $section } and
+            exists $self->[SHASH]{ $section }[NHASH]{ $name };
         return unless $self->[SHASH]{ $section }[NHASH]{ $name }
             [VATTR][ $i ];
         return %{$self->[SHASH]{ $section }[NHASH]{ $name }
@@ -506,6 +530,10 @@ sub vattr {
 
         # return the one attribute's value
         else {
+            # to avoid autoviv 
+            return unless
+                exists $self->[SHASH]{ $section } and
+                exists $self->[SHASH]{ $section }[NHASH]{ $name };
             return $self->[SHASH]{ $section }[NHASH]{ $name }
                 [VATTR][ $i ]{ $parms[0] };
         }
@@ -664,46 +692,82 @@ __END__
 
 =head1 DESCRIPTION
 
-This is an ini-style configuration file processor.  This class
-inherits from Config::Ini.  It uses that module as well as
-Config::Ini::Quote, Text::ParseWords and JSON;
+This is an Ini configuration file processor.  This class inherits from
+Config::Ini.  It uses that module as well as Config::Ini::Quote,
+Text::ParseWords and JSON;
 
 =head2 Terminology
+
+This document uses the terms I<comment>, I<section>, I<name>, and
+I<value> when referring to the following parts of the Ini file syntax:
 
  # comment
  [section]
  name = value
 
-In particular 'name' is the term used to refer to the named
-options within the sections.
+In particular 'name' is the term used to refer to the named options
+within the sections.  This terminology is also reflected in method
+names, like C<get_sections()> and C<get_names()>.
 
 =head2 Syntax
 
+=head3 The I<null section>
+
+At the top of an Ini file, before any sections have been explicitly
+defined, name/value pairs may be defined.  These are assumed to be in
+the 'null section', as if an explicit C<[]> line were present.
+
  # before any sections are defined,
- ; assume section eq ''--the "null section"
+ # assume section eq '', the "null section"
  name = value
  name: value
 
+This 'null section' concept allows for very simple configuration files,
+e.g.,
+
+ title = Hello World
+ color: blue
+ margin: 0
+
+=head3 Comments
+
+Comments may begin with C<'#'> or C<';'>.
+
  # comments may begin with # or ;, i.e.,
  ; semicolon is valid comment character
+
+Comments may begin on a separate line or may follow section headings.
+Comments may not follow unquoted values.
+
+ # this is a comment
+ [section] # this is a comment
+ name = value # this is NOT a comment (it is part of the value)
+
+But comments may follow quoted values.
+
+ # comments are allowed after quoted values
+ name = 'value' # this is a comment
+ name = "value" # this is a comment
+
+=head3 Assignments
+
+Spaces and tabs around the C<'='> and C<':'> assignment characters are
+stripped, i.e., they are not included in the name or value.  Use
+heredoc syntax to set a value with leading spaces.  Trailing spaces in
+values are left intact.
+
  [section]
+ 
  # spaces/tabs around '=' are stripped
  # use heredoc to give a value with leading spaces
  # trailing spaces are left intact
+ 
  name=value
  name= value
  name =value
  name = value
  name    =    value
-
- # this is a comment
- [section] # this is a comment
- name = value # this is NOT a comment
-
- # however, comments are allowed after quoted values
- name = 'value' # this is a comment
- name = "value" # this is a comment
-
+ 
  # colon is valid assignment character, too.
  name:value
  name: value
@@ -711,129 +775,145 @@ options within the sections.
  name : value
  name    :    value
 
- # heredocs are supported several ways:
- 
- # classic heredoc
- name = <<heredoc
- value
- heredoc
+=head3 Heredocs
 
- # and because I kept doing this
+Heredoc syntax may be used to assign values that span multiple lines.
+Heredoc syntax is supported in more ways than just the classic syntax,
+as illustrated below.
+
+ # classic heredoc:
+ name = <<heredoc
+ Heredocs are supported several ways.
+ This is the "classic" syntax, using a
+ "heredoc tag" to mark the begin and end.
+ heredoc
+ 
+ # ... and the following is supported because I kept doing this
  name = <<heredoc
  value
  <<heredoc
-
- # and because who cares what it's called
+ 
+ # ... and also the following, because often no one cares what it's called
  name = <<
  value
  <<
-
- # and "block style" (for vi % support)
+ 
+ # ... and finally "block style" (for vi % support)
  name = {
  value
  }
-
- # and obscure variations, e.g.,
+ 
+ # ... and obscure variations, e.g.,
  name = {heredoc
  value
  heredoc
 
-=head2 Quoted Values
+That is, the heredoc may begin with C<< '<<' >> or C<'{'> with or
+without a tag.  And it may then end with C<< '<<' >> or C<'}'> (with or
+without a tag, as it began).  When a tag is used, the ending
+C<< '<<' >> or C<'}'> is optional.
+
+=head3 Quoted Values
 
 Values may be put in single or double quotes.
 
-Single-quoted values will be parsed literally, except that
-imbedded single quotes must be escaped by doubling them,
-e.g.,
+Single-quoted values will be parsed literally, except that imbedded
+single quotes must be escaped by doubling them, e.g.,
 
  name = 'The ties that bind.'
-
+ 
  $name = $ini->get( section => 'name' );
  # $name eq "The ties that bind."
 
  name = 'The ''ties'' that ''bind.'''
-
+ 
  $name = $ini->get( section => 'name' );
  # $name eq "The 'ties' that 'bind.'"
 
-This uses $Config::Ini::Quote::parse_single_quoted().
+This uses C<$Config::Ini::Quote::parse_single_quoted()>.
 
-Double-quoted values may be parsed a couple of different
-ways.  By default, backslash-escaped unprintable characters
-will be unescaped to their actual Unicode character.  This
-includes ascii control characters like \n, \t, etc.,
-Unicode character codes like \N (Unicode next line), \P
-(Unicode paragraph separator), and hex-value escape
-sequences like \x86 and \u263A.
+Double-quoted values may be parsed a couple of different ways.  By
+default, backslash-escaped unprintable characters will be unescaped to
+their actual Unicode character.  This includes ascii control characters
+like C<\n>, C<\t>, etc., Unicode character codes like C<\N> (Unicode
+next line), C<\P> (Unicode paragraph separator), and hex-value escape
+sequences like C<\x86> and C<\u263A>.
 
-If the ':html' heredoc modifier is used (see Heredoc
-Modifiers below), then HTML entities will be decoded (using
-HTML::Entities) to their actual Unicode characters.
+If the C<':html'> heredoc modifier is used (see Heredoc Modifiers
+below), then HTML entities will be decoded (using HTML::Entities) to
+their actual Unicode characters.
 
-This uses $Config::Ini::Quote::parse_double_quoted(),
+This uses C<$Config::Ini::Quote::parse_double_quoted()>.
 
-See also Config::Ini:Quote.
+See Config::Ini:Quote for more details.
 
-=head2 Heredoc Modifiers
+=head3 Heredoc :modifiers
 
-There are several ways to modify the value in a heredoc as
-the ini file is read in (i.e., as the object is
-initialized):
+There are several ways to modify the value in a heredoc as the Ini file
+is read in (i.e., as the object is initialized):
 
  :chomp    - chomps the last line
  :join     - chomps every line BUT the last one
  :indented - unindents every line (strips leading whitespace)
- :parse    - splits on newline (chomps last line)
+ :parse    - splits on newline (and chomps last line)
  :parse(regex) - splits on regex (still chomps last line)
  :slash    - unescapes backslash-escaped characters in double quotes (default)
  :html     - decodes HTML entities in double quotes
  :json     - parses javascript object notation (complex data types)
 
-The :parse modifier uses Text::ParseWords::parse_line(), so
+The C<':parse'> modifier uses C<Text::ParseWords::parse_line()>, so
 CSV-like parsing is possible.
 
-The :json modifier uses the JSON module to parse and dump
-complex data types (combinations of hashes, arrays,
-scalars).  The value of the heredoc must be valid
-JavaScript Object Notation.
+The C<':json'> modifier uses the JSON module to parse and dump complex
+data types (combinations of hashes, arrays, scalars).  The value of the
+heredoc must be valid JavaScript Object Notation.
 
-The :slash and :html modifiers are only valid when double
-quotes are used (surrounding the heredoc tag and
-modifiers).
+The C<':slash'> and C<':html'> modifiers are only valid when double
+quotes are used (surrounding the heredoc tag and modifiers).  If no
+modifiers are given with double quotes, C<':slash'> is the default.
 
-Modifiers may be stacked, e.g., <<:chomp:join:indented, in
-any order (but :parse and :json are performed last).
+ name = <<"EOT :html"
+ vis-&agrave;-vis
+ EOT
+
+ name = <<"EOT"
+ \tSmiley: \u263A
+ EOT
+
+Modifiers may be stacked, e.g., C<< '<<:chomp:join:indented' >> (or
+C<< '<<:chomp :join :indented' >>), in any order, but note that
+C<':parse'> and C<':json'> are performed last.
 
  # value is "Line1\nLine2\n"
  name = <<
  Line1
  Line2
  <<
-
+ 
  # value is "Line1\nLine2"
  name = <<:chomp
  Line1
  Line2
  <<
-
+ 
  # value is "Line1Line2\n"
  name = <<:join
  Line1
  Line2
  <<
-
+ 
  # value is "Line1Line2"
  name = <<:chomp:join
  Line1
  Line2
  <<
-
+ 
  # value is "  Line1\n  Line2\n"
  name = <<
    Line1
    Line2
  <<
-
+ 
  # - indentations do NOT have to be regular to be unindented
  # - any leading spaces/tabs on every line will be stripped
  # - trailing spaces are left intact, as usual
@@ -842,23 +922,24 @@ any order (but :parse and :json are performed last).
    Line1
    Line2
  <<
-
+ 
  # modifiers may have spaces between them
  # value is "Line1Line2"
  name = << :chomp :join :indented
    Line1
    Line2
  <<
-
- # with heredoc "tag"
+ 
+ # ... and should come after a heredoc "tag"
  # value is "Line1Line2"
  name = <<heredoc :chomp :join :indented
    Line1
    Line2
  heredoc
 
-The :parse modifier turns a single value into multiple
-values, e.g.,
+The C<':parse'> modifier splits a single value into multiple values.
+It may be given with a regular expression parameter to split on other
+than newline (the default).
 
  # :parse is same as :parse(\n)
  name = <<:parse
@@ -866,24 +947,24 @@ values, e.g.,
  value2
  <<
 
-is the same as,
+... is the same as
 
  name = value1
  name = value2
 
-and
+... and
 
  name = <<:parse(/,\s+/)
  "Tom, Dick, and Harry", Fred and Wilma
  <<
 
-is the same as,
+... is the same as
 
  name = Tom, Dick, and Harry
  name = Fred and Wilma
 
-The :parse modifier chomps only the last line by default,
-so include '\n' to parse multiple lines.
+The C<':parse'> modifier chomps only the last line, so include C<'\n'>
+if needed.
 
  # liberal separators
  name = <<:parse([,\s\n]+)
@@ -891,7 +972,7 @@ so include '\n' to parse multiple lines.
  Martha George, 'Hillary and Bill'
  <<
 
-is the same as,
+... is the same as,
 
  name = Tom, Dick, and Harry
  name = Fred and Wilma
@@ -903,34 +984,37 @@ is the same as,
  { a: 1, b: 2, c: 3 }
  <<
 
-Given the above :json example, $ini->get( 'name' ) should
+Given the above C<':json'> example, C<< $ini->get( 'name' ) >> should
 return a hashref.  Note that we accept bare hash keys
-($JSON::BareKey = 1;).
+(C<$JSON::BareKey=1;>).
 
-Modifiers must follow the heredoc characters '<<' (or
-'{').  If there is a heredoc tag, e.g., EOT, the modifiers
-typically follow it, too.
+As illustrated above, the enclosing C<'/'> characters around the
+regular expression are optional.  You may also use matching quotes
+instead, e.g., C<:parse('\s')>.
+
+Modifiers must follow the heredoc characters C<< '<<' >> (or C<'{'>).
+If there is a heredoc tag, e.g., C<'EOT'> below, the modifiers should
+follow it, too.
 
  name = <<EOT:json
  { a: 1, b: 2, c: 3 }
  EOT
 
-If you want to use single or double quotes, surround the
-heredoc tag and modifiers with the appropriate quotes:
+If you want to use single or double quotes, surround the heredoc tag
+and modifiers with the appropriate quotes:
 
  name = <<'EOT :indented'
      line1
      line2
  EOT
-
+ 
  name = <<"EOT :html"
  vis-&agrave;-vis
  EOT
 
-Note, in heredocs, embedded single and double quotes do not
-have to be (and should not be) escaped.  In other words
-leave single quotes as "'" (not "''"), and leave double
-quotes as '"' (not '\"').
+Note, in heredocs, embedded single and double quotes do not have to be
+(and should not be) escaped.  In other words leave single quotes as
+C<"'"> (not C<"''">), and leave double quotes as C<'"'> (not C<'\"'>).
 
  name = <<'EOT :indented'
      'line1'
@@ -947,65 +1031,72 @@ quotes as '"' (not '\"').
  # $name eq qq{"vis-\xE0-vis"}
  $name = $ini->get( 'name' );
 
-If no heredoc tag is used, put the quotes around
-the modifiers.
+If no heredoc tag is used, put the quotes around the modifiers.
 
  name = <<":html"
  vis-&agrave;-vis
  <<
 
-If no modifiers, just use empty quotes.
+If no modifiers either, just use empty quotes.
 
  name = <<""
  vis-\xE0-vis
  <<
 
-Comments are allowed on the assignment line if
-quotes are used.
+Comments are allowed on the assignment line if quotes are used.
 
  name = <<'EOT :indented' # this is a comment
      line1
      line2
  EOT
 
+But note:
+
+ name = <<EOT
+ 'Line1' # this is NOT a comment
+ EOT
+
 =head1 GLOBAL SETTINGS
 
-Note, the global settings below are stored in the
-object during init(), so if they are changed,
-any existing objects will not be affected.
+Note: the global settings below are stored in the object during C<init()>.
+So if the global settings are subsequently changed, any existing
+objects will not be affected.
 
 =over 8
 
 =item $Config::Ini::Edit::keep_comments
 
-This boolean value will determine if comments are
-kept when an ini file is loaded or when an ini
-object is written out.  The default is true--comments
-are kept.  The rationalization is this: The "Edit"
-module is designed to allow you to read, edit, and
-rewrite Ini files.  If a file contains comments to
-start with, you probably want to keep them.
+This boolean value will determine if comments are kept when an Ini file
+is loaded or when an Ini object is written out using C<as_string()>.
+The default is true--comments are kept.  The rational is this:  The
+C<Edit> module is designed to allow you to read, edit, and rewrite Ini
+files.  If a file contains comments to start with, you probably want to
+keep them.
 
 =item $Config::Ini::Edit::heredoc_style
 
-This string can be one of '<<', '<<<<', '{', or '{}'.
-This determines the default heredoc style, respectively:
+This string can be one of C<< '<<' >>, C<< '<<<<' >>, C<'{'>, or
+C<'{}'> (default is C<< '<<' >>).  This determines the default heredoc
+style when the object is written out using C<as_string()>.  If a value
+was read in originally from a heredoc, it will be written out using
+that heredoc style, not this default style.  The above values
+correspond respectively to the following styles.
 
  # '<<'
  name = <<EOT
  Hey
  EOT
-
+  
  # '<<<<'
  name = <<EOT
  Hey
  <<EOT
-
+  
  # '{'
  name = {EOT
  Hey
  EOT
-
+  
  # '{}'
  name = {EOT
  Hey
@@ -1029,28 +1120,35 @@ This determines the default heredoc style, respectively:
 
 =item new( string => $string )
 
+=item new( string => $string, file => 'filename' )
+
+=item new( fh => $filehandle, file => 'filename' )
+
 =item new( file => 'filename', keep_comments => 0 )
 
 =item new( file => 'filename', heredoc_style => '{}' ), etc.
 
-Use new() to create an object, e.g.,
+Use C<new()> to create an object, e.g.,
 
-  my $ini = Config::Ini::Edit->new( 'inifile' );
+ my $ini = Config::Ini::Edit->new( 'inifile' );
 
-If you pass any parameters, the init() object will be called.
-If you pass only one parameter, it's assumed to be the ini file
-name.  Otherwise, use the named parameters, C<file>, C<fh>,
-or C<string> to pass a filename, filehandle (already open),
-or string.  The string is assumed to look like the contents
-of an ini file.
+If you pass any parameters, the C<init()> method will be called.  If
+you pass only one parameter, it's assumed to be the file name.
+Otherwise, use the named parameters, C<'file'>, C<'fh'>, or C<'string'>
+to pass a filename, filehandle (already open), or string.  The string
+is assumed to look like the contents of an Ini file.
 
-Other parameters are C<keep_comments> and C<heredoc_style>
-to override the defaults, true and '<<', respectively.
-The values accepted for heredoc_style are '<<', '<<<<',
-'{', or '{}'.
+The parameter, C<'fh'> takes precedent over C<'string'> which takes
+precedent over C<'file'>.  You may pass C<< file => 'filename' >> with
+the other parameters to set the C<'file'> attribute.
 
-If you do not pass any parameters to new(), you can later
-call init() with the same parameters described above.
+Other parameters are C<'keep_comments'> and C<'heredoc_style'> to
+override the defaults, true and C<< '<<' >>, respectively.  The values
+accepted for heredoc_style are C<< '<<' >>, C<< '<<<<' >>, C<'{'>, or
+C<'{}'>.
+
+If you do not pass any parameters to C<new()>, you can later call
+C<init()> with the same parameters described above.
 
 =item init( 'filename' )
 
@@ -1059,6 +1157,10 @@ call init() with the same parameters described above.
 =item init( fh => $filehandle )
 
 =item init( string => $string )
+
+=item init( string => $string, file => 'filename' )
+
+=item init( fh => $filehandle, file => 'filename' )
 
 =item init( file => 'filename', keep_comments => 0 )
 
@@ -1075,15 +1177,15 @@ call init() with the same parameters described above.
 
 =item get_sections()
 
-Use get_sections() to retrieve a list of the sections in the
-ini file.  They are returned in the order they appear in the
-file.
+Use C<get_sections()> to retrieve a list of the sections in the Ini
+file.  They are returned in the order they appear in the file.
 
  my @sections = $ini->get_sections();
 
-If there is a "null section", it will be the first in the
-list.  If a section appears twice in a file, it only appears
-once in this list.  This implies that ...
+If there is a 'null section', it will be the first in the list.
+
+If a section appears twice in a file, it only appears once in this
+list.  This implies that ...
 
  [section1]
  name1 = value
@@ -1097,37 +1199,43 @@ is the same as ...
  [section1]
  name1 = value
  name3 = value
+ 
  [section2]
  name2 = value
 
-The method, as_string(), will output the latter.
+The C<as_string()> method will output the latter.
 
 =item get_names( $section )
 
-Use get_names() to retrieve a list of the names in a given
-section.
+Use C<get_names()> to retrieve a list of the names in a given section.
 
  my @names = $ini->get_names( $section );
 
-They are returned in the order they appear in the
-section.
+They are returned in the order they appear in the section.
 
-If a name appears twice in a section, it only
-appears once in this list.  This implies that ...
+If a name appears twice in a section, it only appears once in this
+list.  This implies that ...
 
  [section]
  name1 = value1
  name2 = value2
  name1 = another
 
-is the same as
+is the same as ...
 
  [section]
  name1 = value1
  name1 = another
  name2 = value2
 
-The method, as_string(), will output the latter.
+The C<as_string()> method will output the latter.
+
+Calling C<get_names()> without a parameter is the same as calling it
+with a null string: it retrieves the names from the 'null section'.
+The two lines below are equivalent.
+
+ @names = $ini->get_names();
+ @names = $ini->get_names( '' );
 
 =item get( $section, $name )
 
@@ -1135,83 +1243,73 @@ The method, as_string(), will output the latter.
 
 =item get( $name )  (assumes $section eq '')
 
-Use get() to retrieve the value(s) for a given name.
-If a name appears more than once in a section, the
-values are pushed onto an array, and get() will return
-this array of values.
+Use C<get()> to retrieve the value or values for a given name.
+
+Note: when an Ini object is initialized, if a name appears more than
+once in a section, the values are pushed onto an array, and C<get()>
+will return this array of values.
 
  my @values = $ini->get( $section, $name );
 
-Pass an array subscript as the third parameter to
-return only one of the values in this array.
+Pass an array subscript as the third parameter to return only one of
+the values in this array.
 
- my $value = $ini->get( $section, $name, 0 ); # get first one
- my $value = $ini->get( $section, $name, 1 ); # get second one
+ my $value = $ini->get( $section, $name, 0 );  # get first one
+ my $value = $ini->get( $section, $name, 1 );  # get second one
  my $value = $ini->get( $section, $name, -1 ); # get last one
 
-If the ini file lists names at the beginning, before
-any sections are given, the section name is assumed to
-be the null string ('').  If you call get() with just
-one parameter, it is assumed to be a name in this "null
-section".  If you want to pass an array subscript, then
-you must also pass a null string as the first parameter.
+If the Ini file lists names at the beginning, before any sections are
+given, the section name is assumed to be a null string (C<''>).  If you
+call C<get()> with just one parameter, it is assumed to be a name in
+this 'null section'.  If you want to pass an array subscript, then you
+must also pass a null string as the first parameter.
 
  my @values = $ini->get( $name );         # assumes $section eq ''
  my $value  = $ini->get( '', $name, 0 );  # get first occurrence
  my $value  = $ini->get( '', $name, -1 ); # get last occurrence
 
-This "null section" concept allows for very simple
-configuration files like:
-
- title = Hello World
- color: blue
- margin: 0
-
 =back
 
 =head2 Add/Set/Put Methods
 
-Here, 'add' implies pushing values onto the end,
-'set', modifying a single value, and 'put', replacing
-all values at once.
+Here, I<add> denotes pushing values onto the end, I<set>, modifying a
+single value, and I<put>, replacing all values at once.
 
 =over 8
 
 =item add( $section, $name, @values )
 
-Use add() to add to the value(s) of an option.  If
-the option already has values, the new values will
-be added to the end (pushed onto the array).
+Use C<add()> to add to the value or values of an option.  If the option
+already has values, the new values will be added to the end (pushed
+onto the array).
 
  $ini->add( $section, $name, @values );
 
-To add to the "null section", pass a null string.
+To add to the 'null section', pass a null string.
 
  $ini->add( '', $name, @values );
 
 =item set( $section, $name, $i, $value )
 
-Use set() to assign a single value.  Pass undef to
-remove a value altogether.  The $i parameter is the
-subscript of the values array to assign to (or remove).
+Use C<set()> to assign a single value.  Pass C<undef> to remove a value
+altogether.  The C<$i> parameter is the subscript of the values array to
+assign to (or remove).
 
  $ini->set( $section, $name, -1, $value ); # set last value
- $ini->set( $section, $name, 0, undef ); # remove first value
+ $ini->set( $section, $name, 0, undef );   # remove first value
 
-To set a value in the "null section", pass a null
-string.
+To set a value in the 'null section', pass a null string.
 
  $ini->set( '', $name, 1, $value ); # set second value
 
 =item put( $section, $name, @values )
 
-Use put() to assign all values at once.  Any
-existing values are overwritten.
+Use C<put()> to assign all values at once.  Any existing values are
+overwritten.
 
  $ini->put( $section, $name, @values );
 
-To put values in the "null section", pass a null
-string.
+To put values in the 'null section', pass a null string.
 
  $ini->put( '', $name, @values );
 
@@ -1223,35 +1321,35 @@ string.
 
 =item delete_section( $section )
 
-Use delete_section() to delete an entire section,
-including all of its options and their values.
+Use C<delete_section()> to delete an entire section, including all of
+its options and their values.
 
  $ini->delete_section( $section )
 
-To delete the "null section", don't
-pass any parameters (or pass a null string).
+To delete the 'null section', don't pass any parameters or pass a null
+string.
 
  $ini->delete_section();
  $ini->delete_section( '' );
 
 =item delete_name( $section, $name )
 
-Use delete_name() to delete a named option and all
-of its values from a section.
+Use C<delete_name()> to delete a named option and all of its values
+from a section.
 
  $ini->delete_name( $section, $name );
 
-To delete an option from the "null section",
-pass just the name, or pass a null string.
+To delete an option from the 'null section', pass just the name, or
+pass a null string.
 
  $ini->delete_name( $name );
  $ini->delete_name( '', $name );
 
-To delete just some of the values, you can use set() with a
-subscript, passing undef to delete that one, or you can
-first get them using get(), then modify them (e.g., delete
-some).  Finally, use put() to replace the old values with
-the modified ones.
+To delete just some of the values, you can use C<set()> with a
+subscript, passing C<undef> to delete each one.  Or you can first get them
+into an array using C<get()>, modify them in that array (e.g., delete
+some), and then use C<put()> to replace the old values with the
+modified ones.
 
 =back
 
@@ -1261,40 +1359,45 @@ the modified ones.
 
 =item file( $filename )
 
-Use file() to get or set the name of the object's
-ini file.  Pass the file name to set the value.
-Pass undef to remove the C<file> attribute altogether.
+Use C<file()> to get or set the name of the object's Ini file.  Pass the
+file name to set the value.  Pass C<undef> to remove the C<'file'> attribute
+altogether.
 
  $inifile_name = $ini->file();  # get
- $ini->file( $inifile_name );  # set
- $ini->file( undef );  # remove
+ $ini->file( $inifile_name );   # set
+ $ini->file( undef );           # remove
 
 =item keep_comments( $boolean )
 
-Use keep_comments() to get or set the object's C<keep_comments>
-attribute.  The default for this attribute is true, i.e.,
-do keep comments.  Pass a false value to turn comments off.
+Use C<keep_comments()> to get or set the object's C<'keep_comments'>
+attribute.  The default for this attribute is true, i.e., do keep
+comments.  Pass a false value to turn comments off.
 
  $boolean = $ini->keep_comments();  # get
- $ini->keep_comments( $boolean );  # set
+ $ini->keep_comments( $boolean );   # set
+
+Note that C<keep_comments()> accesses the value of the flag that is
+stored in the object--not the value of the global setting.
 
 =item heredoc_style( $style )
 
-Use heredoc_style() to get or set the default style
-used when heredocs are rendered by as_string().
+Use C<heredoc_style()> to get or set the default style used when
+heredocs are rendered by C<as_string()>.
 
  $style = $ini->heredoc_style();  # get
- $ini->heredoc_style( $style );  # set
+ $ini->heredoc_style( $style );   # set
 
-The value passed should be one of '<<', '<<<<',
-'{', or '{}'.  The default is '<<'.
+The value passed should be one of C<< '<<' >>, C<< '<<<<' >>, C<'{'>,
+or C<'{}'>.  The default is C<< '<<' >>.
 
-See also init() and GLOBAL SETTINGS above.
+Note that C<heredoc_style()> accesses the value of the style that is
+stored in the object--not the value of the global setting.
+
+See also C<init()> and GLOBAL SETTINGS above.
 
 =item vattr( $section, $name, $i, $attribute, $value, ... )
 
-Use vattr() to get or set value-level attributes,
-which include:
+Use C<vattr()> to get or set value-level attributes, which include:
 
  heretag   : 'string'
  herestyle : ( {, {}, <<, or <<<< )
@@ -1306,149 +1409,140 @@ which include:
  json      : boolean
  comment   : 'string'
 
-If $i is undefined, 0 is assumed.  If there's
-an $attribute, but no $value, the value of that
-attribute is returned.
+If C<$i> is undefined, C<0> is assumed.  If there's an C<$attribute>,
+but no C<$value>, the value of that attribute is returned.
 
- $value = vattr( $section, $name, 0, 'heretag' );  # get one
+ $value = $ini->vattr( $section, $name, 0, 'heretag' );  # get one
 
-If no $attribute is given, vattr() returns all of the
-attribute names and values as a list (in pairs).
+If no C<$attribute> is given, C<vattr()> returns all of the attribute
+names and values as a list (in pairs).
 
- %attrs = vattr( $section, $name, 1 ); # get all
+ %attrs = $ini->vattr( $section, $name, 1 ); # get all
 
-If $attribute is a hashref, values are set from that hash.
+If C<$attribute> is a hashref, values are set from that hash.
 
  %ah = ( heretag=>'EOT', herestyle=>'{}' );
- vattr( $section, $name, 1, \%ah );
+ $ini->vattr( $section, $name, 1, \%ah );
 
-Otherwise, attributes and values may be passed as
-named parameters.
+Otherwise, attributes and values may be passed as named parameters.
 
- vattr( $section, $name, 1, heretag=>'EOT', herestyle=>'{}' );
+ $ini->vattr( $section, $name, 1, heretag=>'EOT', herestyle=>'{}' );
 
-These value attributes are used to replicate the ini
-file when as_string() is called.
+These value attributes are used to replicate the ini file when
+C<as_string()> is called.
 
-C<escape>, C<indented>, and C<json> correspond to the
-corresponding heredoc modifiers; see C<Heredoc Modifiers>
-above.  C<heretag>, C<herestyle>, and C<quote> are used to
-begin and end the heredoc.  Additionally, if double quotes
-are called for, characters in the value will be escaped
-according to the C<escape> modifier.
+The attributes C<'escape'>, C<'indented'>, and C<'json'> correspond to
+the similarly named heredoc modifiers; see C<Heredoc Modifiers> above.
+The values of C<'heretag'>, C<'herestyle'>, and C<'quote'> are used to
+begin and end the heredoc.  Additionally, if double quotes are called
+for, characters in the value will be escaped according to the
+C<'escape'> value.
 
-C<comment> will be appended after the value, or if a
-heredoc, after the beginning of the heredoc.  Note, the
-comment may also be accessed using set_comment() and
-get_comment().  See below.
+The value of C<'comment'> will be appended after the value, or if a
+heredoc, after the beginning of the heredoc.  Note that the comment may
+also be accessed using C<set_comment()> and C<get_comment()>.  See
+below.
 
-The value of C<equals> will be output between the name
-and value, e.g., ' = ' between "name = value".  C<nquote>
-is to the name what C<quote> is to the value, i.e., if
-"'", the name will be single quoted, if '"', double.
-
+The value of C<'equals'> will be output between the name and value,
+e.g., C<' = '> in C<'name = value'>.  The setting, C<'nquote'>, is to
+the name what C<'quote'> is to the value, i.e., if C<"'">, the name
+will be single quoted, if C<'"'>, double quoted.
 
 =back
 
 =head2 Comments Accessor Methods
 
-An ini file may contain comments.  Normally, when your
-program reads an ini file, it doesn't care about comments.
-But if you want to edit an ini file using the Config::Ini::Edit
-module, you will want to keep the comments.
+An Ini file may contain comments.  Normally, when your program reads an
+Ini file, it doesn't care about comments.  But if you want to edit an
+Ini file using the Config::Ini::Edit module, you will want to keep the
+comments.
 
-Set $Config::Ini::Edit::keep_comments to 0 if you do not
-want the Config::Ini::Edit object to retain the comments
-that are in the file.  The default is 1--comments are
-kept.  This applies to new(), init(), and as_string(),
-i.e., new() and init() will load the comments into the
-object, and as_string() will output these comments.
+Set C<$Config::Ini::Edit::keep_comments = 0;> if you do not want the
+Config::Ini::Edit object to retain the comments that are in the file.
+The default is C<1>--comments are kept.  This applies to C<new()>,
+C<init()>, and C<as_string()>, i.e., C<new()> and C<init()> will load
+the comments into the object, and C<as_string()> will output these
+comments.
 
-Or you can pass the C<keep_comments> parameter
-to the new() or init() methods as described above.
+Or you can pass the C<'keep_comments'> parameter to the C<new()> or
+C<init()> methods as described above.
 
 =over 8
 
 =item get_comments( $section, $name, $i )
 
-Use get_comments() to return the comments that appear ABOVE
-a certain name.  Since names may be repeated (forming an
-array of values), pass an array index ($i) to identify the
-comment desired.  If $i is undefined, 0 is assumed.
+Use C<get_comments()> to return the comments that appear B<above> a
+certain name.  Since names may be repeated (forming an array of
+values), pass an array index (C<$i>) to identify the comment desired.
+If C<$i> is undefined, C<0> is assumed.
 
- my $comments = get_comments( $section, $name );
+ my $comments = $ini->get_comments( $section, $name );
 
 =item get_comment( $section, $name, $i )
 
-Use get_comment() (singular) to return the comments that
-appear ON the same line as a certain name's assignment.
-Pass an array index ($i) to identify the comment desired.
-If $i is undefined, 0 is assumed.
+Use C<get_comment()> (singular) to return the comments that appear
+B<on> the same line as a certain name's assignment.  Pass an array
+index (C<$i>) to identify the comment desired.  If C<$i> is undefined,
+C<0> is assumed.
 
- $comment = get_comment( $section, $name );
+ $comment = $ini->get_comment( $section, $name );
 
 =item set_comments( $section, $name, $i, @comments )
 
-Use set_comments() to specify comments for a given
-occurrence of a name.  When as_string() is called,
-these comments will appear ABOVE the name.
+Use C<set_comments()> to specify comments for a given occurrence of a
+name.  When C<as_string()> is called, these comments will appear
+B<above> the name.
 
   $ini->set_comments( $section, $name, 0, 'Hello World' );
 
-In an ini file, comments must begin with '#' or ';' and end
-with a newline.  If your comments don't, '# ' and "\n" will
-be added.
+In an Ini file, comments must begin with C<'#'> or C<';'> and end with
+a newline.  If your comments don't, C<'# '> and C<"\n"> will be added.
 
 =item set_comment( $section, $name, $i, @comments )
 
-Use set_comment() to specify comments for a given
-occurrence of a name.  When as_string() is called, these
-comments will appear ON the same line as the name's
-assignment.
+Use C<set_comment()> to specify comments for a given occurrence of a
+name.  When C<as_string()> is called, these comments will appear B<on>
+the same line as the name's assignment.
 
   $ini->set_comment( $section, $name, 0, 'Hello World' );
 
-In an ini file, comments must begin with '#' or ';'.  If
-your comments don't, '# ' will be added.  If you pass an
-array of comments, they will be strung together on one
-line.
+In an Ini file, comments must begin with C<'#'> or C<';'>.  If your
+comments don't, C<'# '> will be added.  If you pass an array of
+comments, they will be strung together on one line.
 
 =item get_section_comments( $section )
 
-Use get_section_comments() to retrieve the comments
-that appear ABOVE the [section] line, e.g.,
+Use C<get_section_comments()> to retrieve the comments that appear B<above>
+the C<[section]> line, e.g.,
 
  # Comment 1
  [section] # Comment 2
  
+ # $comments eq "# Comment 1\n"
  my $comments = $ini->get_section_comments( $section );
-
-In the above example, $comments eq "# Comment 1\n";
 
 =item get_section_comment( $section )
 
-Use get_section_comment() (note: singular 'comment') to
-retrieve the comment that appears ON the same line as
-the [section] line.
+Use C<get_section_comment()> (note: singular 'comment') to retrieve the
+comment that appears B<on> the same line as the C<[section]> line.
 
  # Comment 1
  [section] # Comment 2
  
+ # $comment eq " # Comment 2\n"
  my $comment = $ini->get_section_comment( $section );
-
-In the above example, $comment eq " # Comment 2\n";
 
 =item set_section_comments( $section, @comments )
 
-Use set_section_comments() to set the value of the
-comments above the [section] line.
+Use C<set_section_comments()> to set the value of the comments above
+the C<[section]> line.
 
  $ini->set_section_comments( $section, $comments );
 
 =item set_section_comment( $section, @comments )
 
-Use set_section_comment() (singular) to set the value of the
-comment at the end of the [section] line.
+Use C<set_section_comment()> (singular) to set the value of the comment
+at the end of the C<[section]> line.
 
  $ini->set_section_comment( $section, $comment );
 
@@ -1460,57 +1554,59 @@ comment at the end of the [section] line.
 
 =item as_string()
 
-Use as_string() to dump the Config::Ini::Edit object in an ini file
-format.  If $Config::Ini::Edit::keep_comments is true, the comments
+Use C<as_string()> to dump the Config::Ini::Edit object in an Ini file
+format.  If C<$Config::Ini::Edit::keep_comments> is true, the comments
 will be included.
 
  print INIFILE $ini->as_string();
 
-The value as_string() returns is not guaranteed to be
-exactly what was in the original ini file.  But you can
-expect the following:
+The value C<as_string()> returns is not guaranteed to be exactly what
+was in the original Ini file.  But you can expect the following:
 
 - All sections and names will be retained.
 
-- All values will resolve correctly, i.e., a call to
-get() will return the expected value.
+- All values will resolve correctly, i.e., a call to C<get()> will
+return the expected value.
 
-- All comments will be present (if keep_comments is true).
+- All comments will be present (if C<'keep_comments'> is true).
 
-- As many value attributes as possible will be retained, e.g.,
-quotes, escapes, indents, etc.  But the :parse modifier will
-NOT be retained.
+- As many value attributes as possible will be retained, e.g., quotes,
+escapes, indents, etc.  But the C<':parse'> modifier will B<not> be
+retained.
 
-- If the same section appears multiple times in a file,
-all of its options will be output in only one occurrence
-of that section, in the position of the original first
+- If the same section appears multiple times in a file, all of its
+options will be output in only one occurrence of that section, in the
+position of the original first occurrence.  E.g.,
+
+ [section1]
+ name1 = value
+ [section2]
+ name2 = value
+ [section1]
+ name3 = value
+
+will be output as
+
+ [section1]
+ name1 = value
+ name3 = value
+ 
+ [section2]
+ name2 = value
+
+(Note that as_string() inserts a blank line between sections if there
+is not a comment there.)
+
+- If the same name appears multiple times in a section, all of its
+occurrences will be grouped together, at the same position as the first
 occurrence.  E.g.,
-
- [section1]
- name1 = value
- [section2]
- name2 = value
- [section1]
- name3 = value
-
-will be output as,
-
- [section1]
- name1 = value
- name3 = value
- [section2]
- name2 = value
-
-- If the same name appears multiple times in a section,
-all of its occurrences will be grouped together, at the
-same position as the first occurrence.  E.g.,
 
  [section]
  name1 = value1
  name2 = value2
  name1 = another
 
-will be output as,
+will be output as
 
  [section]
  name1 = value1
@@ -1518,7 +1614,6 @@ will be output as,
  name2 = value2
 
 =back
-
 
 =head1 SEE ALSO
 
@@ -1534,11 +1629,10 @@ Brad Baxter, E<lt>bmb@mail.libs.uga.eduE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2006 by Brad Baxter
+Copyright (C) 2008 by Brad Baxter
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.7 or,
 at your option, any later version of Perl 5 you may have available.
-
 
 =cut

@@ -2,7 +2,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 3;
+use Test::More tests => 1;
 
 use Config::Ini::Edit;
 
@@ -10,25 +10,12 @@ my $data = do{ local $/; <DATA> };
 
 my $ini = Config::Ini::Edit->new( string => $data );
 
-$ini->delete_name( section1 => 'name1.1' );
-my @names = $ini->get_names( 'section1' );
-is( "@names", 'name1.2', 'delete_name( s, n )' );
-
-$ini->delete_name( '' => 'name0.1' );
-@names = $ini->get_names( '' );
-is( "@names", 'name0.2 name0.3', "delete_name( '', n )" );
-
-$ini->delete_name( 'name0.2' );
-@names = $ini->get_names();
-is( "@names", 'name0.3', 'delete_name( n )' );
+$ini->set( section1 => 'name1.1', 0, 'abc' );
+$ini->set( section1 => 'name1.1', 1, 'def' );
+is( join( ' ', $ini->get( section1 => 'name1.1' ) ),
+    'abc def', 'set( section, name, i, values )' );
 
 __DATA__
-# null section
-
-name0.1 = value0.1
-name0.2 = value0.2
-name0.3 = value0.3
-
 # Section 1
 
 [section1]

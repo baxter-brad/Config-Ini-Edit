@@ -1,10 +1,13 @@
 Revision history for Perl extension Config::Ini::Edit.
 
-0.01  Sat Feb 11 11:09:48 2006
-    - original version; created by h2xs 1.23 with options
-        -AX --skip-exporter --use-new-tests -n Config::Ini::Edit
+1.00  Fri Nov  7 15:15:39 EST 2008
+    - bug fixes, pod copyedited, more tests, added to svn repository
 
 0.10  Tue Aug  8 14:01:13 EDT 2006
     - enhancements and bug fixes for inclusion in sitegen
         (http://purl.galileo.usg.edu/sitegen/)
+
+0.01  Sat Feb 11 11:09:48 2006
+    - original version; created by h2xs 1.23 with options
+        -AX --skip-exporter --use-new-tests -n Config::Ini::Edit
 

@@ -2,7 +2,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 1;
+use Test::More tests => 3;
 
 use Config::Ini::Edit;
 
@@ -12,10 +12,23 @@ my $ini = Config::Ini::Edit->new( string => $data );
 
 $ini->delete_section( 'section1' );
 my @sections = $ini->get_sections();
-is( "@sections", 'section2', 'delete_section()' );
+# (leading space is for null section)
+is( "@sections", ' section2', 'delete_section( section )' );
 
+$ini->delete_section( '' );
+@sections = $ini->get_sections();
+is( "@sections", 'section2', "delete_section( '' )" );
+
+$ini = Config::Ini::Edit->new( string => $data );
+$ini->delete_section();
+@sections = $ini->get_sections();
+is( "@sections", 'section1 section2', "delete_section()" );
 
 __DATA__
+# null section
+
+n01 = v01
+
 # Section 1
 
 [section1]
