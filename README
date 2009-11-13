@@ -1,4 +1,4 @@
-Config-Ini-Edit version 1.00
+Config-Ini-Edit version 1.01
 ============================
 
 INSTALLATION
@@ -22,7 +22,7 @@ This module requires these other modules and libraries:
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2006 by Brad Baxter
+Copyright (C) 2009 by Brad Baxter
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.7 or,

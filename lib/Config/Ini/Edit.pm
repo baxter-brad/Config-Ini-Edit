@@ -40,19 +40,19 @@ Config::Ini::Edit - Ini configuration file reader and writer
  
  # rewrite the file
  my $inifile = $ini->file();
- open INI, '>', $inifile or croak "Can't open $inifile: $!";
+ open INI, '>:encoding(utf8)', $inifile or croak "Can't open $inifile: $!";
  print INI $ini->as_string();
  close INI;
 
 =head1 VERSION
 
-VERSION: 1.00
+VERSION: 1.01
 
 =cut
 
 # more POD follows the __END__
 
-our $VERSION = '1.00';
+our $VERSION = '1.01';
 
 our @ISA = qw( Config::Ini );
 use Config::Ini;
@@ -125,6 +125,8 @@ use constant VATTR => 2;
 # autoloaded accessors
 use subs qw( file keep_comments heredoc_style );
 
+our $Encoding = 'utf8';
+
 #---------------------------------------------------------------------
 # inherited methods
 ## new()                                    see Config::Ini
@@ -165,10 +167,10 @@ sub init {
 
     unless( $fh ) {
         if( $string ) {
-            open $fh, '<', \$string
+            open $fh, "<:encoding($Encoding)", \$string
                 or croak "Can't open string: $!"; }
         elsif( $file ) {
-            open $fh, '<', $file
+            open $fh, "<:encoding($Encoding)", $file
                 or croak "Can't open $file: $!"; }
         else { croak "Invalid parms" }
     }
@@ -1150,6 +1152,16 @@ C<'{}'>.
 If you do not pass any parameters to C<new()>, you can later call
 C<init()> with the same parameters described above.
 
+By default, if you give a filename or string, the module will open it
+using ":encoding(utf8)".  You can change this by setting
+$Config::Ini::Edit::Encoding, e.g.,
+
+ $Config::Ini::Edit::Encoding = "iso-8859-1";
+ my $ini = Config::Ini::Edit->new( file => 'filename' );
+
+Alternatively, you may open the file yourself using the desired
+encoding and send the filehandle to new() (or init());
+
 =item init( 'filename' )
 
 =item init( file => 'filename' )
@@ -1629,7 +1641,7 @@ Brad Baxter, E<lt>bmb@mail.libs.uga.eduE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2008 by Brad Baxter
+Copyright (C) 2009 by Brad Baxter
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.7 or,

@@ -10,6 +10,8 @@ t/05-ini-edit-get_comments.t
 t/06-ini-edit-pod.t
 t/07-ini-edit-indent.t
 t/08-ini-edit-null-section.t
+t/09-ini-edit-autoviv.t
+t/10-ini-edit-encoding.t
 t/101-ini-edit-new-init.t
 t/102-ini-edit-get.t
 t/103-ini-edit-get_sections.t
@@ -28,6 +30,8 @@ t/209-ini-edit-delete_section.t
 t/210-ini-edit-attr.t
 t/211-ini-edit-vattr.t
 t/212-ini-edit-accessors.t
+t/213-ini-edit-set.t
+t/214-ini-edit-set_comment.t
 t/301-ini-edit-quote.t
 t/302-ini-edit-oddities.t
 lib/Config/Ini/Edit.pm
