@@ -1,0 +1,955 @@
+!NAME
+Config::Ini::Edit - Ini configuration file reader and writer
+
+!SYNOPSIS
+{{{
+ use Config::Ini::Edit;
+ 
+ my $ini = Config::Ini::Edit->new( 'file.ini' );
+ 
+ # traverse the values
+ for my $section ( $ini->get_sections() ) {
+     print "$section\n";
+ 
+     for my $name ( $ini->get_names( $section ) ) {
+         print "  $name\n";
+ 
+         for my $value ( $ini->get( $section, $name ) ) {
+             print "    $value\n";
+         }
+     }
+ }
+ 
+ # rewrite the file
+ my $inifile = $ini->file();
+ open INI, '>:encoding(utf8)', $inifile or croak "Can't open $inifile: $!";
+ print INI $ini->as_string();
+ close INI;
+}}}
+
+!VERSION
+VERSION: 1.02
+
+!DESCRIPTION
+This is an Ini configuration file processor. This class inherits from Config::Ini. It uses that module as well as Config::Ini::Quote, Text::~ParseWords and JSON;
+
+!!Terminology
+This document uses the terms //comment//, //section//, //name//, and //value// when referring to the following parts of the Ini file syntax:
+
+{{{
+ # comment
+ [section]
+ name = value
+}}}
+
+In particular 'name' is the term used to refer to the named options within the sections. This terminology is also reflected in method names, like {{{get_sections()}}} and {{{get_names()}}}.
+
+!!Syntax
+!!!The //null section//
+At the top of an Ini file, before any sections have been explicitly defined, name/value pairs may be defined. These are assumed to be in the 'null section', as if an explicit {{{[]}}} line were present.
+
+{{{
+ # before any sections are defined,
+ # assume section eq '', the "null section"
+ name = value
+ name: value
+}}}
+
+This 'null section' concept allows for very simple configuration files, e.g.,
+
+{{{
+ title = Hello World
+ color: blue
+ margin: 0
+}}}
+
+!!!Comments
+Comments may begin with {{{'#'}}} or {{{';'}}}.
+
+{{{
+ # comments may begin with # or ;, i.e.,
+ ; semicolon is valid comment character
+}}}
+
+Comments may begin on a separate line or may follow section headings. Comments may not follow unquoted values.
+
+{{{
+ # this is a comment
+ [section] # this is a comment
+ name = value # this is NOT a comment (it is part of the value)
+}}}
+
+But comments may follow quoted values.
+
+{{{
+ # comments are allowed after quoted values
+ name = 'value' # this is a comment
+ name = "value" # this is a comment
+}}}
+
+!!!Assignments
+Spaces and tabs around the {{{'='}}} and {{{':'}}} assignment characters are stripped, i.e., they are not included in the name or value. Use heredoc syntax to set a value with leading spaces. Trailing spaces in values are left intact.
+
+{{{
+ [section]
+ 
+ # spaces/tabs around '=' are stripped
+ # use heredoc to give a value with leading spaces
+ # trailing spaces are left intact
+ 
+ name=value
+ name= value
+ name =value
+ name = value
+ name    =    value
+ 
+ # colon is valid assignment character, too.
+ name:value
+ name: value
+ name :value
+ name : value
+ name    :    value
+}}}
+
+!!!Heredocs
+Heredoc syntax may be used to assign values that span multiple lines. Heredoc syntax is supported in more ways than just the classic syntax, as illustrated below.
+
+{{{
+ # classic heredoc:
+ name = <<heredoc
+ Heredocs are supported several ways.
+ This is the "classic" syntax, using a
+ "heredoc tag" to mark the begin and end.
+ heredoc
+ 
+ # ... and the following is supported because I kept doing this
+ name = <<heredoc
+ value
+ <<heredoc
+ 
+ # ... and also the following, because often no one cares what it's called
+ name = <<
+ value
+ <<
+ 
+ # ... and finally "block style" (for vi % support)
+ name = {
+ value
+ }
+ 
+ # ... and obscure variations, e.g.,
+ name = {heredoc
+ value
+ heredoc
+}}}
+
+That is, the heredoc may begin with {{{'<<'}}} or {{{'{'}}} with or without a tag. And it may then end with {{{'<<'}}} or {{{'}'}}} (with or without a tag, as it began). When a tag is used, the ending {{{'<<'}}} or {{{'}'}}} is optional.
+
+!!!Quoted Values
+Values may be put in single or double quotes.
+
+Single-quoted values will be parsed literally, except that imbedded single quotes must be escaped by doubling them, e.g.,
+
+{{{
+ name = 'The ties that bind.'
+ 
+ $name = $ini->get( section => 'name' );
+ # $name eq "The ties that bind."
+
+ name = 'The ''ties'' that ''bind.'''
+ 
+ $name = $ini->get( section => 'name' );
+ # $name eq "The 'ties' that 'bind.'"
+}}}
+
+This uses {{{$Config::Ini::Quote::parse_single_quoted()}}}.
+
+Double-quoted values may be parsed a couple of different ways. By default, backslash-escaped unprintable characters will be unescaped to their actual Unicode character. This includes ascii control characters like {{{\n}}}, {{{\t}}}, etc., Unicode character codes like {{{\N}}} (Unicode next line), {{{\P}}} (Unicode paragraph separator), and hex-value escape sequences like {{{\x86}}} and {{{\u263A}}}.
+
+If the {{{':html'}}} heredoc modifier is used (see Heredoc Modifiers below), then HTML entities will be decoded (using HTML::Entities) to their actual Unicode characters.
+
+This uses {{{$Config::Ini::Quote::parse_double_quoted()}}}.
+
+See Config::Ini:Quote for more details.
+
+!!!Heredoc :modifiers
+There are several ways to modify the value in a heredoc as the Ini file is read in (i.e., as the object is initialized):
+
+{{{
+ :chomp    - chomps the last line
+ :join     - chomps every line BUT the last one
+ :indented - unindents every line (strips leading whitespace)
+ :parse    - splits on newline (and chomps last line)
+ :parse(regex) - splits on regex (still chomps last line)
+ :slash    - unescapes backslash-escaped characters in double quotes (default)
+ :html     - decodes HTML entities in double quotes
+ :json     - parses javascript object notation (complex data types)
+}}}
+
+The {{{':parse'}}} modifier uses {{{Text::ParseWords::parse_line()}}}, so CSV-like parsing is possible.
+
+The {{{':json'}}} modifier uses the JSON module to parse and dump complex data types (combinations of hashes, arrays, scalars). The value of the heredoc must be valid ~JavaScript Object Notation.
+
+The {{{':slash'}}} and {{{':html'}}} modifiers are only valid when double quotes are used (surrounding the heredoc tag and modifiers). If no modifiers are given with double quotes, {{{':slash'}}} is the default.
+
+{{{
+ name = <<"EOT :html"
+ vis-&agrave;-vis
+ EOT
+
+ name = <<"EOT"
+ \tSmiley: \u263A
+ EOT
+}}}
+
+Modifiers may be stacked, e.g., {{{'<<:chomp:join:indented'}}} (or {{{'<<:chomp :join :indented'}}}), in any order, but note that {{{':parse'}}} and {{{':json'}}} are performed last.
+
+{{{
+ # value is "Line1\nLine2\n"
+ name = <<
+ Line1
+ Line2
+ <<
+ 
+ # value is "Line1\nLine2"
+ name = <<:chomp
+ Line1
+ Line2
+ <<
+ 
+ # value is "Line1Line2\n"
+ name = <<:join
+ Line1
+ Line2
+ <<
+ 
+ # value is "Line1Line2"
+ name = <<:chomp:join
+ Line1
+ Line2
+ <<
+ 
+ # value is "  Line1\n  Line2\n"
+ name = <<
+   Line1
+   Line2
+ <<
+ 
+ # - indentations do NOT have to be regular to be unindented
+ # - any leading spaces/tabs on every line will be stripped
+ # - trailing spaces are left intact, as usual
+ # value is "Line1\nLine2\n"
+ name = <<:indented
+   Line1
+   Line2
+ <<
+ 
+ # modifiers may have spaces between them
+ # value is "Line1Line2"
+ name = << :chomp :join :indented
+   Line1
+   Line2
+ <<
+ 
+ # ... and should come after a heredoc "tag"
+ # value is "Line1Line2"
+ name = <<heredoc :chomp :join :indented
+   Line1
+   Line2
+ heredoc
+}}}
+
+The {{{':parse'}}} modifier splits a single value into multiple values. It may be given with a regular expression parameter to split on other than newline (the default).
+
+{{{
+ # :parse is same as :parse(\n)
+ name = <<:parse
+ value1
+ value2
+ <<
+}}}
+
+... is the same as
+
+{{{
+ name = value1
+ name = value2
+}}}
+
+... and
+
+{{{
+ name = <<:parse(/,\s+/)
+ "Tom, Dick, and Harry", Fred and Wilma
+ <<
+}}}
+
+... is the same as
+
+{{{
+ name = Tom, Dick, and Harry
+ name = Fred and Wilma
+}}}
+
+The {{{':parse'}}} modifier chomps only the last line, so include {{{'\n'}}} if needed.
+
+{{{
+ # liberal separators
+ name = <<:parse([,\s\n]+)
+ "Tom, Dick, and Harry" "Fred and Wilma"
+ Martha George, 'Hillary and Bill'
+ <<
+}}}
+
+... is the same as,
+
+{{{
+ name = Tom, Dick, and Harry
+ name = Fred and Wilma
+ name = Martha
+ name = George
+ name = Hillary and Bill
+
+ name = <<:json
+ { a: 1, b: 2, c: 3 }
+ <<
+}}}
+
+Given the above {{{':json'}}} example, {{{$ini->get( 'name' )}}} should return a hashref. Note that we accept bare hash keys ({{{$JSON::BareKey=1;}}}).
+
+As illustrated above, the enclosing {{{'/'}}} characters around the regular expression are optional. You may also use matching quotes instead, e.g., {{{:parse('\s')}}}.
+
+Modifiers must follow the heredoc characters {{{'<<'}}} (or {{{'{'}}}). If there is a heredoc tag, e.g., {{{'EOT'}}} below, the modifiers should follow it, too.
+
+{{{
+ name = <<EOT:json
+ { a: 1, b: 2, c: 3 }
+ EOT
+}}}
+
+If you want to use single or double quotes, surround the heredoc tag and modifiers with the appropriate quotes:
+
+{{{
+ name = <<'EOT :indented'
+     line1
+     line2
+ EOT
+ 
+ name = <<"EOT :html"
+ vis-&agrave;-vis
+ EOT
+}}}
+
+Note, in heredocs, embedded single and double quotes do not have to be (and should not be) escaped. In other words leave single quotes as {{{"'"}}} (not {{{"''"}}}), and leave double quotes as {{{'"'}}} (not {{{'\"'}}}).
+
+{{{
+ name = <<'EOT :indented'
+     'line1'
+     'line2'
+ EOT
+ 
+ # $name eq "'line1'\n'line2'\n"
+ $name = $ini->get( 'name' );
+
+ name = <<"EOT :html"
+ "vis-&agrave;-vis"
+ EOT
+ 
+ # $name eq qq{"vis-\xE0-vis"}
+ $name = $ini->get( 'name' );
+}}}
+
+If no heredoc tag is used, put the quotes around the modifiers.
+
+{{{
+ name = <<":html"
+ vis-&agrave;-vis
+ <<
+}}}
+
+If no modifiers either, just use empty quotes.
+
+{{{
+ name = <<""
+ vis-\xE0-vis
+ <<
+}}}
+
+Comments are allowed on the assignment line if quotes are used.
+
+{{{
+ name = <<'EOT :indented' # this is a comment
+     line1
+     line2
+ EOT
+}}}
+
+But note:
+
+{{{
+ name = <<EOT
+ 'Line1' # this is NOT a comment
+ EOT
+}}}
+
+!GLOBAL SETTINGS
+Note: the global settings below are stored in the object during {{{init()}}}. So if the global settings are subsequently changed, any existing objects will not be affected.
+
+* $Config::Ini::Edit::keep_comments This boolean value will determine if comments are kept when an Ini file is loaded or when an Ini object is written out using {{{as_string()}}}. The default is true -- comments are kept. The rational is this: The {{{Edit}}} module is designed to allow you to read, edit, and rewrite Ini files. If a file contains comments to start with, you probably want to keep them.
+* $Config::Ini::Edit::heredoc_style This string can be one of {{{'<<'}}}, {{{'<<<<'}}}, {{{'{'}}}, or {{{'{}'}}} (default is {{{'<<'}}}). This determines the default heredoc style when the object is written out using {{{as_string()}}}. If a value was read in originally from a heredoc, it will be written out using that heredoc style, not this default style. The above values correspond respectively to the following styles.
+{{{
+ # '<<'
+ name = <<EOT
+ Hey
+ EOT
+  
+ # '<<<<'
+ name = <<EOT
+ Hey
+ <<EOT
+  
+ # '{'
+ name = {EOT
+ Hey
+ EOT
+  
+ # '{}'
+ name = {EOT
+ Hey
+ }EOT
+}}}
+
+
+!METHODS
+!!Initialization Methods
+!!!new()
+Calling options:
+
+{{{
+ new( 'filename' )
+ new( file => 'filename' )
+ new( fh => $filehandle )
+ new( string => $string )
+ new( string => $string, file => 'filename' )
+ new( fh => $filehandle, file => 'filename' )
+ new( file => 'filename', keep_comments => 0 )
+ new( file => 'filename', heredoc_style => '{}' ), etc.
+}}}
+
+Use {{{new()}}} to create an object, e.g.,
+
+{{{
+ my $ini = Config::Ini::Edit->new( 'inifile' );
+}}}
+
+If you pass any parameters, the {{{init()}}} method will be called. If you pass only one parameter, it's assumed to be the file name. Otherwise, use the named parameters, {{{'file'}}}, {{{'fh'}}}, or {{{'string'}}} to pass a filename, filehandle (already open), or string. The string is assumed to look like the contents of an Ini file.
+
+The parameter, {{{'fh'}}} takes precedent over {{{'string'}}} which takes precedent over {{{'file'}}}. You may pass {{{file => 'filename'}}} with the other parameters to set the {{{'file'}}} attribute.
+
+Other parameters are {{{'keep_comments'}}} and {{{'heredoc_style'}}} to override the defaults, true and {{{'<<'}}}, respectively. The values accepted for heredoc_style are {{{'<<'}}}, {{{'<<<<'}}}, {{{'{'}}}, or {{{'{}'}}}.
+
+If you do not pass any parameters to {{{new()}}}, you can later call {{{init()}}} with the same parameters described above.
+
+By default, if you give a filename or string, the module will open it using ":encoding(utf8)". You can change this by setting $Config::Ini::Edit::Encoding, e.g.,
+
+{{{
+ $Config::Ini::Edit::Encoding = "iso-8859-1";
+ my $ini = Config::Ini::Edit->new( file => 'filename' );
+}}}
+
+Alternatively, you may open the file yourself using the desired encoding and send the filehandle to new() (or init());
+
+!!!init()
+Calling options:
+
+{{{
+ init( 'filename' )
+ init( file => 'filename' )
+ init( fh => $filehandle )
+ init( string => $string )
+ init( string => $string, file => 'filename' )
+ init( fh => $filehandle, file => 'filename' )
+ init( file => 'filename', keep_comments => 0 )
+ init( file => 'filename', heredoc_style => '{}' ), etc.
+}}}
+
+Example:
+
+{{{
+ my $ini = Config::Ini::Edit->new();
+ $ini->init( 'filename' );
+}}}
+
+!!Get Methods
+!!!get_sections()
+Use {{{get_sections()}}} to retrieve a list of the sections in the Ini file. They are returned in the order they appear in the file.
+
+{{{
+ my @sections = $ini->get_sections();
+}}}
+
+If there is a 'null section', it will be the first in the list.
+
+If a section appears twice in a file, it only appears once in this list. This implies that ...
+
+{{{
+ [section1]
+ name1 = value
+ [section2]
+ name2 = value
+ [section1]
+ name3 = value
+}}}
+
+is the same as ...
+
+{{{
+ [section1]
+ name1 = value
+ name3 = value
+ 
+ [section2]
+ name2 = value
+}}}
+
+The {{{as_string()}}} method will output the latter.
+
+!!!get_names()
+Calling options:
+
+{{{
+ get_names( $section )
+ get_names( '' )
+ get_names()
+}}}
+
+Use {{{get_names()}}} to retrieve a list of the names in a given section.
+
+{{{
+ my @names = $ini->get_names( $section );
+}}}
+
+They are returned in the order they appear in the section.
+
+If a name appears twice in a section, it only appears once in this list. This implies that ...
+
+{{{
+ [section]
+ name1 = value1
+ name2 = value2
+ name1 = another
+}}}
+
+is the same as ...
+
+{{{
+ [section]
+ name1 = value1
+ name1 = another
+ name2 = value2
+}}}
+
+The {{{as_string()}}} method will output the latter.
+
+Calling {{{get_names()}}} without a parameter is the same as calling it with a null string: it retrieves the names from the 'null section'. The two lines below are equivalent.
+
+{{{
+ @names = $ini->get_names();
+ @names = $ini->get_names( '' );
+}}}
+
+!!!get()
+Calling options:
+
+{{{
+ get( $section, $name )
+ get( $section, $name, $i )
+ get( $name )  (assumes $section eq '')
+ get( '', $name, $i )
+}}}
+
+Use {{{get()}}} to retrieve the value or values for a given name.
+
+Note: when an Ini object is initialized, if a name appears more than once in a section, the values are pushed onto an array, and {{{get()}}} will return this array of values.
+
+{{{
+ my @values = $ini->get( $section, $name );
+}}}
+
+Pass an array subscript as the third parameter to return only one of the values in this array.
+
+{{{
+ my $value = $ini->get( $section, $name, 0 );  # get first one
+ my $value = $ini->get( $section, $name, 1 );  # get second one
+ my $value = $ini->get( $section, $name, -1 ); # get last one
+}}}
+
+If the Ini file lists names at the beginning, before any sections are given, the section name is assumed to be a null string ({{{''}}}). If you call {{{get()}}} with just one parameter, it is assumed to be a name in this 'null section'. If you want to pass an array subscript, then you must also pass a null string as the first parameter.
+
+{{{
+ my @values = $ini->get( $name );         # assumes $section eq ''
+ my $value  = $ini->get( '', $name, 0 );  # get first occurrence
+ my $value  = $ini->get( '', $name, -1 ); # get last occurrence
+}}}
+
+!!Add/Set/Put Methods
+Here, //add// denotes pushing values onto the end, //set//, modifying a single value, and //put//, replacing all values at once.
+
+!!!add()
+Calling options:
+
+{{{
+ add( $section, $name, @values )
+ add( '', $name, @values )
+}}}
+
+Use {{{add()}}} to add to the value or values of an option. If the option already has values, the new values will be added to the end (pushed onto the array).
+
+{{{
+ $ini->add( $section, $name, @values );
+}}}
+
+To add to the 'null section', pass a null string.
+
+{{{
+ $ini->add( '', $name, @values );
+}}}
+
+!!!set()
+Calling options:
+
+{{{
+ set( $section, $name, $i, $value )
+ set( '', $name, $i, $value )
+}}}
+
+Use {{{set()}}} to assign a single value. Pass {{{undef}}} to remove a value altogether. The {{{$i}}} parameter is the subscript of the values array to assign to (or remove).
+
+{{{
+ $ini->set( $section, $name, -1, $value ); # set last value
+ $ini->set( $section, $name, 0, undef );   # remove first value
+}}}
+
+To set a value in the 'null section', pass a null string.
+
+{{{
+ $ini->set( '', $name, 1, $value ); # set second value
+}}}
+
+!!!put()
+Calling options:
+
+{{{
+ put( $section, $name, @values )
+ put( '', $name, @values )
+}}}
+
+Use {{{put()}}} to assign all values at once. Any existing values are overwritten.
+
+{{{
+ $ini->put( $section, $name, @values );
+}}}
+
+To put values in the 'null section', pass a null string.
+
+{{{
+ $ini->put( '', $name, @values );
+}}}
+
+!!Delete Methods
+!!!delete_section()
+Calling options:
+
+{{{
+ delete_section( $section )
+ delete_section( '' )
+ delete_section()
+}}}
+
+Use {{{delete_section()}}} to delete an entire section, including all of its options and their values.
+
+{{{
+ $ini->delete_section( $section )
+}}}
+
+To delete the 'null section', don't pass any parameters or pass a null string.
+
+{{{
+ $ini->delete_section();
+ $ini->delete_section( '' );
+}}}
+
+!!!delete_name()
+Calling options:
+
+{{{
+ delete_name( $section, $name )
+ delete_name( '', $name )
+ delete_name( $name )
+}}}
+
+Use {{{delete_name()}}} to delete a named option and all of its values from a section.
+
+{{{
+ $ini->delete_name( $section, $name );
+}}}
+
+To delete an option from the 'null section', pass just the name, or pass a null string.
+
+{{{
+ $ini->delete_name( $name );
+ $ini->delete_name( '', $name );
+}}}
+
+To delete just some of the values, you can use {{{set()}}} with a subscript, passing {{{undef}}} to delete each one. Or you can first get them into an array using {{{get()}}}, modify them in that array (e.g., delete some), and then use {{{put()}}} to replace the old values with the modified ones.
+
+!!Other Accessor Methods
+!!!file()
+Calling options:
+
+{{{
+ file()
+ file( $filename )
+ file( undef )
+}}}
+
+Use {{{file()}}} to get or set the name of the object's Ini file. Pass the file name to set the value. Pass {{{undef}}} to remove the {{{'file'}}} attribute altogether.
+
+{{{
+ $inifile_name = $ini->file();  # get
+ $ini->file( $inifile_name );   # set
+ $ini->file( undef );           # remove
+}}}
+
+!!!keep_comments()
+Calling options:
+
+{{{
+ keep_comments()
+ keep_comments( $boolean )
+}}}
+
+Use {{{keep_comments()}}} to get or set the object's {{{'keep_comments'}}} attribute. The default for this attribute is true, i.e., do keep comments. Pass a false value to turn comments off.
+
+{{{
+ $boolean = $ini->keep_comments();  # get
+ $ini->keep_comments( $boolean );   # set
+}}}
+
+Note that {{{keep_comments()}}} accesses the value of the flag that is stored in the object -- not the value of the global setting.
+
+!!!heredoc_style()
+Calling options:
+
+{{{
+ heredoc_style()
+ heredoc_style( $style )
+}}}
+
+Use {{{heredoc_style()}}} to get or set the default style used when heredocs are rendered by {{{as_string()}}}.
+
+{{{
+ $style = $ini->heredoc_style();  # get
+ $ini->heredoc_style( $style );   # set
+}}}
+
+The value passed should be one of {{{'<<'}}}, {{{'<<<<'}}}, {{{'{'}}}, or {{{'{}'}}}. The default is {{{'<<'}}}.
+
+Note that {{{heredoc_style()}}} accesses the value of the style that is stored in the object -- not the value of the global setting.
+
+See also {{{init()}}} and GLOBAL SETTINGS above.
+
+!!!vattr( $section, $name, $i, $attribute, $value, ... )
+Use {{{vattr()}}} to get or set value-level attributes, which include:
+
+{{{
+ heretag   : 'string'
+ herestyle : ( {, {}, <<, or <<<< )
+ quote     : ( ', ", s, d, single, or double )
+ nquote    : ( ', ", s, d, single, or double )
+ equals    : ( '=', ':', ' = ', ': ', etc. )
+ escape    : ( :slash and/or :html )
+ indented  : indentation value (white space)
+ json      : boolean
+ comment   : 'string'
+}}}
+
+If {{{$i}}} is undefined, {{{0}}} is assumed. If there's an {{{$attribute}}}, but no {{{$value}}}, the value of that attribute is returned.
+
+{{{
+ $value = $ini->vattr( $section, $name, 0, 'heretag' );  # get one
+}}}
+
+If no {{{$attribute}}} is given, {{{vattr()}}} returns all of the attribute names and values as a list (in pairs).
+
+{{{
+ %attrs = $ini->vattr( $section, $name, 1 ); # get all
+}}}
+
+If {{{$attribute}}} is a hashref, values are set from that hash.
+
+{{{
+ %ah = ( heretag=>'EOT', herestyle=>'{}' );
+ $ini->vattr( $section, $name, 1, \%ah );
+}}}
+
+Otherwise, attributes and values may be passed as named parameters.
+
+{{{
+ $ini->vattr( $section, $name, 1, heretag=>'EOT', herestyle=>'{}' );
+}}}
+
+These value attributes are used to replicate the ini file when {{{as_string()}}} is called.
+
+The attributes {{{'escape'}}}, {{{'indented'}}}, and {{{'json'}}} correspond to the similarly named heredoc modifiers; see {{{Heredoc Modifiers}}} above. The values of {{{'heretag'}}}, {{{'herestyle'}}}, and {{{'quote'}}} are used to begin and end the heredoc. Additionally, if double quotes are called for, characters in the value will be escaped according to the {{{'escape'}}} value.
+
+The value of {{{'comment'}}} will be appended after the value, or if a heredoc, after the beginning of the heredoc. Note that the comment may also be accessed using {{{set_comment()}}} and {{{get_comment()}}}. See below.
+
+The value of {{{'equals'}}} will be output between the name and value, e.g., {{{' = '}}} in {{{'name = value'}}}. The setting, {{{'nquote'}}}, is to the name what {{{'quote'}}} is to the value, i.e., if {{{"'"}}}, the name will be single quoted, if {{{'"'}}}, double quoted.
+
+!!Comments Accessor Methods
+An Ini file may contain comments. Normally, when your program reads an Ini file, it doesn't care about comments. But if you want to edit an Ini file using the Config::Ini::Edit module, you will want to keep the comments.
+
+Set {{{$Config::Ini::Edit::keep_comments = 0;}}} if you do not want the Config::Ini::Edit object to retain the comments that are in the file. The default is {{{1}}} -- comments are kept. This applies to {{{new()}}}, {{{init()}}}, and {{{as_string()}}}, i.e., {{{new()}}} and {{{init()}}} will load the comments into the object, and {{{as_string()}}} will output these comments.
+
+Or you can pass the {{{'keep_comments'}}} parameter to the {{{new()}}} or {{{init()}}} methods as described above.
+
+!!!get_comments( $section, $name, $i )
+Use {{{get_comments()}}} to return the comments that appear ''above'' a certain name. Since names may be repeated (forming an array of values), pass an array index ({{{$i}}}) to identify the comment desired. If {{{$i}}} is undefined, {{{0}}} is assumed.
+
+{{{
+ my $comments = $ini->get_comments( $section, $name );
+}}}
+
+!!!get_comment( $section, $name, $i )
+Use {{{get_comment()}}} (singular) to return the comments that appear ''on'' the same line as a certain name's assignment. Pass an array index ({{{$i}}}) to identify the comment desired. If {{{$i}}} is undefined, {{{0}}} is assumed.
+
+{{{
+ $comment = $ini->get_comment( $section, $name );
+}}}
+
+!!!set_comments( $section, $name, $i, @comments )
+Use {{{set_comments()}}} to specify comments for a given occurrence of a name. When {{{as_string()}}} is called, these comments will appear ''above'' the name.
+
+{{{
+  $ini->set_comments( $section, $name, 0, 'Hello World' );
+}}}
+
+In an Ini file, comments must begin with {{{'#'}}} or {{{';'}}} and end with a newline. If your comments don't, {{{'# '}}} and {{{"\n"}}} will be added.
+
+!!!set_comment( $section, $name, $i, @comments )
+Use {{{set_comment()}}} to specify comments for a given occurrence of a name. When {{{as_string()}}} is called, these comments will appear ''on'' the same line as the name's assignment.
+
+{{{
+  $ini->set_comment( $section, $name, 0, 'Hello World' );
+}}}
+
+In an Ini file, comments must begin with {{{'#'}}} or {{{';'}}}. If your comments don't, {{{'# '}}} will be added. If you pass an array of comments, they will be strung together on one line.
+
+!!!get_section_comments( $section )
+Use {{{get_section_comments()}}} to retrieve the comments that appear ''above'' the {{{[section]}}} line, e.g.,
+
+{{{
+ # Comment 1
+ [section] # Comment 2
+ 
+ # $comments eq "# Comment 1\n"
+ my $comments = $ini->get_section_comments( $section );
+}}}
+
+!!!get_section_comment( $section )
+Use {{{get_section_comment()}}} (note: singular 'comment') to retrieve the comment that appears ''on'' the same line as the {{{[section]}}} line.
+
+{{{
+ # Comment 1
+ [section] # Comment 2
+ 
+ # $comment eq " # Comment 2\n"
+ my $comment = $ini->get_section_comment( $section );
+}}}
+
+!!!set_section_comments( $section, @comments )
+Use {{{set_section_comments()}}} to set the value of the comments above the {{{[section]}}} line.
+
+{{{
+ $ini->set_section_comments( $section, $comments );
+}}}
+
+!!!set_section_comment( $section, @comments )
+Use {{{set_section_comment()}}} (singular) to set the value of the comment at the end of the {{{[section]}}} line.
+
+{{{
+ $ini->set_section_comment( $section, $comment );
+}}}
+
+!!Recreating the Ini File Structure
+!!!as_string()
+Use {{{as_string()}}} to dump the Config::Ini::Edit object in an Ini file format. If {{{$Config::Ini::Edit::keep_comments}}} is true, the comments will be included.
+
+{{{
+ print INIFILE $ini->as_string();
+}}}
+
+The value {{{as_string()}}} returns is not guaranteed to be exactly what was in the original Ini file. But you can expect the following:
+
+- All sections and names will be retained.
+
+- All values will resolve correctly, i.e., a call to {{{get()}}} will return the expected value.
+
+- All comments will be present (if {{{'keep_comments'}}} is true).
+
+- As many value attributes as possible will be retained, e.g., quotes, escapes, indents, etc. But the {{{':parse'}}} modifier will ''not'' be retained.
+
+- If the same section appears multiple times in a file, all of its options will be output in only one occurrence of that section, in the position of the original first occurrence. E.g.,
+
+{{{
+ [section1]
+ name1 = value
+ [section2]
+ name2 = value
+ [section1]
+ name3 = value
+}}}
+
+will be output as
+
+{{{
+ [section1]
+ name1 = value
+ name3 = value
+ 
+ [section2]
+ name2 = value
+}}}
+
+(Note that as_string() inserts a blank line between sections if there is not a comment there.)
+
+- If the same name appears multiple times in a section, all of its occurrences will be grouped together, at the same position as the first occurrence. E.g.,
+
+{{{
+ [section]
+ name1 = value1
+ name2 = value2
+ name1 = another
+}}}
+
+will be output as
+
+{{{
+ [section]
+ name1 = value1
+ name1 = another
+ name2 = value2
+}}}
+
+!SEE ALSO
+Config::Ini, Config::Ini::Quote, Config::Ini::Expanded, Config::~IniFiles, Config:: ... (many others)
+
+!AUTHOR
+Brad Baxter, <bmb@mail.libs.uga.edu>
+
+!COPYRIGHT AND LICENSE
+Copyright (C) 2010 by Brad Baxter
+
+This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself, either Perl version 5.8.7 or, at your option, any later version of Perl 5 you may have available.
+

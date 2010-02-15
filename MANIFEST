@@ -2,6 +2,7 @@ Changes
 Makefile.PL
 MANIFEST
 README
+Config-Ini-Edit.tiddlywiki
 t/01-ini-edit-string-file-fh.t
 t/02-ini-edit-altchars.t
 t/03-ini-edit-indent.t

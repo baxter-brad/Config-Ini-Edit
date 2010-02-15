@@ -1,5 +1,8 @@
 Revision history for Perl extension Config::Ini::Edit.
 
+1.02 Fri Feb 12 15:25:36 EST 2010
+    - modified POD for better results from pod2wiki --style tiddlywiki
+
 1.01 Fri Nov 13 15:33:12 EST 2009
     - added $Config::Ini::Edit::Encoding and t/10-ini-edit-encoding.t
 

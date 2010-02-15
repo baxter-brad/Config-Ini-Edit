@@ -46,13 +46,13 @@ Config::Ini::Edit - Ini configuration file reader and writer
 
 =head1 VERSION
 
-VERSION: 1.01
+VERSION: 1.02
 
 =cut
 
 # more POD follows the __END__
 
-our $VERSION = '1.01';
+our $VERSION = '1.02';
 
 our @ISA = qw( Config::Ini );
 use Config::Ini;
@@ -1070,7 +1070,7 @@ objects will not be affected.
 
 This boolean value will determine if comments are kept when an Ini file
 is loaded or when an Ini object is written out using C<as_string()>.
-The default is true--comments are kept.  The rational is this:  The
+The default is true -- comments are kept.  The rational is this:  The
 C<Edit> module is designed to allow you to read, edit, and rewrite Ini
 files.  If a file contains comments to start with, you probably want to
 keep them.
@@ -1110,25 +1110,18 @@ correspond respectively to the following styles.
 
 =head2 Initialization Methods
 
-=over 8
+=head3 new()
 
-=item new()
+Calling options:
 
-=item new( 'filename' )
-
-=item new( file => 'filename' )
-
-=item new( fh => $filehandle )
-
-=item new( string => $string )
-
-=item new( string => $string, file => 'filename' )
-
-=item new( fh => $filehandle, file => 'filename' )
-
-=item new( file => 'filename', keep_comments => 0 )
-
-=item new( file => 'filename', heredoc_style => '{}' ), etc.
+ new( 'filename' )
+ new( file => 'filename' )
+ new( fh => $filehandle )
+ new( string => $string )
+ new( string => $string, file => 'filename' )
+ new( fh => $filehandle, file => 'filename' )
+ new( file => 'filename', keep_comments => 0 )
+ new( file => 'filename', heredoc_style => '{}' ), etc.
 
 Use C<new()> to create an object, e.g.,
 
@@ -1162,32 +1155,27 @@ $Config::Ini::Edit::Encoding, e.g.,
 Alternatively, you may open the file yourself using the desired
 encoding and send the filehandle to new() (or init());
 
-=item init( 'filename' )
+=head3 init()
 
-=item init( file => 'filename' )
+Calling options:
 
-=item init( fh => $filehandle )
+ init( 'filename' )
+ init( file => 'filename' )
+ init( fh => $filehandle )
+ init( string => $string )
+ init( string => $string, file => 'filename' )
+ init( fh => $filehandle, file => 'filename' )
+ init( file => 'filename', keep_comments => 0 )
+ init( file => 'filename', heredoc_style => '{}' ), etc.
 
-=item init( string => $string )
-
-=item init( string => $string, file => 'filename' )
-
-=item init( fh => $filehandle, file => 'filename' )
-
-=item init( file => 'filename', keep_comments => 0 )
-
-=item init( file => 'filename', heredoc_style => '{}' ), etc.
+Example:
 
  my $ini = Config::Ini::Edit->new();
  $ini->init( 'filename' );
 
-=back
-
 =head2 Get Methods
 
-=over 8
-
-=item get_sections()
+=head3 get_sections()
 
 Use C<get_sections()> to retrieve a list of the sections in the Ini
 file.  They are returned in the order they appear in the file.
@@ -1217,7 +1205,13 @@ is the same as ...
 
 The C<as_string()> method will output the latter.
 
-=item get_names( $section )
+=head3 get_names()
+
+Calling options:
+
+ get_names( $section )
+ get_names( '' )
+ get_names()
 
 Use C<get_names()> to retrieve a list of the names in a given section.
 
@@ -1249,11 +1243,14 @@ The two lines below are equivalent.
  @names = $ini->get_names();
  @names = $ini->get_names( '' );
 
-=item get( $section, $name )
+=head3 get()
 
-=item get( $section, $name, $i )
+Calling options:
 
-=item get( $name )  (assumes $section eq '')
+ get( $section, $name )
+ get( $section, $name, $i )
+ get( $name )  (assumes $section eq '')
+ get( '', $name, $i )
 
 Use C<get()> to retrieve the value or values for a given name.
 
@@ -1280,16 +1277,17 @@ must also pass a null string as the first parameter.
  my $value  = $ini->get( '', $name, 0 );  # get first occurrence
  my $value  = $ini->get( '', $name, -1 ); # get last occurrence
 
-=back
-
 =head2 Add/Set/Put Methods
 
 Here, I<add> denotes pushing values onto the end, I<set>, modifying a
 single value, and I<put>, replacing all values at once.
 
-=over 8
+=head3 add()
 
-=item add( $section, $name, @values )
+Calling options:
+
+ add( $section, $name, @values )
+ add( '', $name, @values )
 
 Use C<add()> to add to the value or values of an option.  If the option
 already has values, the new values will be added to the end (pushed
@@ -1301,7 +1299,12 @@ To add to the 'null section', pass a null string.
 
  $ini->add( '', $name, @values );
 
-=item set( $section, $name, $i, $value )
+=head3 set()
+
+Calling options:
+
+ set( $section, $name, $i, $value )
+ set( '', $name, $i, $value )
 
 Use C<set()> to assign a single value.  Pass C<undef> to remove a value
 altogether.  The C<$i> parameter is the subscript of the values array to
@@ -1314,7 +1317,12 @@ To set a value in the 'null section', pass a null string.
 
  $ini->set( '', $name, 1, $value ); # set second value
 
-=item put( $section, $name, @values )
+=head3 put()
+
+Calling options:
+
+ put( $section, $name, @values )
+ put( '', $name, @values )
 
 Use C<put()> to assign all values at once.  Any existing values are
 overwritten.
@@ -1325,13 +1333,15 @@ To put values in the 'null section', pass a null string.
 
  $ini->put( '', $name, @values );
 
-=back
-
 =head2 Delete Methods
 
-=over 8
+=head3 delete_section()
 
-=item delete_section( $section )
+Calling options:
+
+ delete_section( $section )
+ delete_section( '' )
+ delete_section()
 
 Use C<delete_section()> to delete an entire section, including all of
 its options and their values.
@@ -1344,7 +1354,13 @@ string.
  $ini->delete_section();
  $ini->delete_section( '' );
 
-=item delete_name( $section, $name )
+=head3 delete_name()
+
+Calling options:
+
+ delete_name( $section, $name )
+ delete_name( '', $name )
+ delete_name( $name )
 
 Use C<delete_name()> to delete a named option and all of its values
 from a section.
@@ -1363,13 +1379,15 @@ into an array using C<get()>, modify them in that array (e.g., delete
 some), and then use C<put()> to replace the old values with the
 modified ones.
 
-=back
-
 =head2 Other Accessor Methods
 
-=over 8
+=head3 file()
 
-=item file( $filename )
+Calling options:
+
+ file()
+ file( $filename )
+ file( undef )
 
 Use C<file()> to get or set the name of the object's Ini file.  Pass the
 file name to set the value.  Pass C<undef> to remove the C<'file'> attribute
@@ -1379,7 +1397,12 @@ altogether.
  $ini->file( $inifile_name );   # set
  $ini->file( undef );           # remove
 
-=item keep_comments( $boolean )
+=head3 keep_comments()
+
+Calling options:
+
+ keep_comments()
+ keep_comments( $boolean )
 
 Use C<keep_comments()> to get or set the object's C<'keep_comments'>
 attribute.  The default for this attribute is true, i.e., do keep
@@ -1389,9 +1412,14 @@ comments.  Pass a false value to turn comments off.
  $ini->keep_comments( $boolean );   # set
 
 Note that C<keep_comments()> accesses the value of the flag that is
-stored in the object--not the value of the global setting.
+stored in the object -- not the value of the global setting.
 
-=item heredoc_style( $style )
+=head3 heredoc_style()
+
+Calling options:
+
+ heredoc_style()
+ heredoc_style( $style )
 
 Use C<heredoc_style()> to get or set the default style used when
 heredocs are rendered by C<as_string()>.
@@ -1403,11 +1431,11 @@ The value passed should be one of C<< '<<' >>, C<< '<<<<' >>, C<'{'>,
 or C<'{}'>.  The default is C<< '<<' >>.
 
 Note that C<heredoc_style()> accesses the value of the style that is
-stored in the object--not the value of the global setting.
+stored in the object -- not the value of the global setting.
 
 See also C<init()> and GLOBAL SETTINGS above.
 
-=item vattr( $section, $name, $i, $attribute, $value, ... )
+=head3 vattr( $section, $name, $i, $attribute, $value, ... )
 
 Use C<vattr()> to get or set value-level attributes, which include:
 
@@ -1460,8 +1488,6 @@ e.g., C<' = '> in C<'name = value'>.  The setting, C<'nquote'>, is to
 the name what C<'quote'> is to the value, i.e., if C<"'">, the name
 will be single quoted, if C<'"'>, double quoted.
 
-=back
-
 =head2 Comments Accessor Methods
 
 An Ini file may contain comments.  Normally, when your program reads an
@@ -1471,7 +1497,7 @@ comments.
 
 Set C<$Config::Ini::Edit::keep_comments = 0;> if you do not want the
 Config::Ini::Edit object to retain the comments that are in the file.
-The default is C<1>--comments are kept.  This applies to C<new()>,
+The default is C<1> -- comments are kept.  This applies to C<new()>,
 C<init()>, and C<as_string()>, i.e., C<new()> and C<init()> will load
 the comments into the object, and C<as_string()> will output these
 comments.
@@ -1479,9 +1505,7 @@ comments.
 Or you can pass the C<'keep_comments'> parameter to the C<new()> or
 C<init()> methods as described above.
 
-=over 8
-
-=item get_comments( $section, $name, $i )
+=head3 get_comments( $section, $name, $i )
 
 Use C<get_comments()> to return the comments that appear B<above> a
 certain name.  Since names may be repeated (forming an array of
@@ -1490,7 +1514,7 @@ If C<$i> is undefined, C<0> is assumed.
 
  my $comments = $ini->get_comments( $section, $name );
 
-=item get_comment( $section, $name, $i )
+=head3 get_comment( $section, $name, $i )
 
 Use C<get_comment()> (singular) to return the comments that appear
 B<on> the same line as a certain name's assignment.  Pass an array
@@ -1499,7 +1523,7 @@ C<0> is assumed.
 
  $comment = $ini->get_comment( $section, $name );
 
-=item set_comments( $section, $name, $i, @comments )
+=head3 set_comments( $section, $name, $i, @comments )
 
 Use C<set_comments()> to specify comments for a given occurrence of a
 name.  When C<as_string()> is called, these comments will appear
@@ -1510,7 +1534,7 @@ B<above> the name.
 In an Ini file, comments must begin with C<'#'> or C<';'> and end with
 a newline.  If your comments don't, C<'# '> and C<"\n"> will be added.
 
-=item set_comment( $section, $name, $i, @comments )
+=head3 set_comment( $section, $name, $i, @comments )
 
 Use C<set_comment()> to specify comments for a given occurrence of a
 name.  When C<as_string()> is called, these comments will appear B<on>
@@ -1522,7 +1546,7 @@ In an Ini file, comments must begin with C<'#'> or C<';'>.  If your
 comments don't, C<'# '> will be added.  If you pass an array of
 comments, they will be strung together on one line.
 
-=item get_section_comments( $section )
+=head3 get_section_comments( $section )
 
 Use C<get_section_comments()> to retrieve the comments that appear B<above>
 the C<[section]> line, e.g.,
@@ -1533,7 +1557,7 @@ the C<[section]> line, e.g.,
  # $comments eq "# Comment 1\n"
  my $comments = $ini->get_section_comments( $section );
 
-=item get_section_comment( $section )
+=head3 get_section_comment( $section )
 
 Use C<get_section_comment()> (note: singular 'comment') to retrieve the
 comment that appears B<on> the same line as the C<[section]> line.
@@ -1544,27 +1568,23 @@ comment that appears B<on> the same line as the C<[section]> line.
  # $comment eq " # Comment 2\n"
  my $comment = $ini->get_section_comment( $section );
 
-=item set_section_comments( $section, @comments )
+=head3 set_section_comments( $section, @comments )
 
 Use C<set_section_comments()> to set the value of the comments above
 the C<[section]> line.
 
  $ini->set_section_comments( $section, $comments );
 
-=item set_section_comment( $section, @comments )
+=head3 set_section_comment( $section, @comments )
 
 Use C<set_section_comment()> (singular) to set the value of the comment
 at the end of the C<[section]> line.
 
  $ini->set_section_comment( $section, $comment );
 
-=back
-
 =head2 Recreating the Ini File Structure
 
-=over 8
-
-=item as_string()
+=head3 as_string()
 
 Use C<as_string()> to dump the Config::Ini::Edit object in an Ini file
 format.  If C<$Config::Ini::Edit::keep_comments> is true, the comments
@@ -1625,8 +1645,6 @@ will be output as
  name1 = another
  name2 = value2
 
-=back
-
 =head1 SEE ALSO
 
 Config::Ini,
@@ -1641,7 +1659,7 @@ Brad Baxter, E<lt>bmb@mail.libs.uga.eduE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2009 by Brad Baxter
+Copyright (C) 2010 by Brad Baxter
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.7 or,
