@@ -46,13 +46,13 @@ Config::Ini::Edit - Ini configuration file reader and writer
 
 =head1 VERSION
 
-VERSION: 1.02
+VERSION: 1.03
 
 =cut
 
 # more POD follows the __END__
 
-our $VERSION = '1.02';
+our $VERSION = '1.03';
 
 our @ISA = qw( Config::Ini );
 use Config::Ini;
@@ -63,8 +63,9 @@ $JSON::Pretty  = 1;
 $JSON::BareKey = 1;  # *accepts* bare keys
 $JSON::KeySort = 1;
 
-our $keep_comments = 1;     # boolean, user may set to 0
-our $heredoc_style = '<<';  # for as_string()
+our $encoding      = 'utf8'; # for new()/init()
+our $keep_comments = 1;      # boolean, user may set to 0
+our $heredoc_style = '<<';   # for as_string()
 
 use constant SECTIONS => 0;
 use constant SHASH    => 1;
@@ -122,11 +123,6 @@ use constant VATTR => 2;
 # The fact that this note is here indicates that I'm not 100%
 # happy with either choice.
 
-# autoloaded accessors
-use subs qw( file keep_comments heredoc_style );
-
-our $Encoding = 'utf8';
-
 #---------------------------------------------------------------------
 # inherited methods
 ## new()                                    see Config::Ini
@@ -156,22 +152,37 @@ sub init {
     $file   = $parms{'file'};
     $fh     = $parms{'fh'};
     $string = $parms{'string'};
-    for( qw( keep_comments heredoc_style ) ) {
-        no strict 'refs';
-        $self->_attr( $_ => $parms{ $_ } || $$_ );
+    for( qw( keep_comments heredoc_style encoding ) ) {
+        no strict 'refs';  # so "$$_" will get above values
+        $self->_attr( $_ =>
+            (defined $parms{ $_ }) ? $parms{ $_ } : $$_ );
     }
     $self->_attr( file => $file ) if $file;
 
-    my $keep_comments =
-        $self->_attr( 'keep_comments' ) || $keep_comments;
+    my $keep_comments = $self->keep_comments();
+    my $encoding      = $self->encoding();
 
     unless( $fh ) {
         if( $string ) {
-            open $fh, "<:encoding($Encoding)", \$string
-                or croak "Can't open string: $!"; }
+            if( $encoding ) {
+                open $fh, "<:encoding($encoding)", \$string
+                    or croak "Can't open string: $!";
+            }
+            else {
+                open $fh, "<", \$string
+                    or croak "Can't open string: $!";
+            }
+        }
         elsif( $file ) {
-            open $fh, "<:encoding($Encoding)", $file
-                or croak "Can't open $file: $!"; }
+            if( $encoding ) {
+                open $fh, "<:encoding($encoding)", $file
+                    or croak "Can't open $file: $!";
+            }
+            else {
+                open $fh, "<", $file
+                    or croak "Can't open $file: $!";
+            }
+        }
         else { croak "Invalid parms" }
     }
 
@@ -565,12 +576,14 @@ sub vattr {
 ## file( 'filename' )
 ## keep_comments( 1 )
 ## heredoc_style( '<<' )
+## encoding( 'utf8' )
+
 our $AUTOLOAD;
 sub AUTOLOAD {
     my $attribute = $AUTOLOAD;
     $attribute =~ s/.*:://;
     die "Undefined: $attribute()" unless $attribute =~ /^(?:
-        file | keep_comments | heredoc_style
+        file | keep_comments | heredoc_style | encoding
         )$/x;
     my $self = shift;
     $self->_attr( $attribute, @_ );
@@ -582,10 +595,8 @@ sub DESTROY {}
 ## $ini->as_string()
 sub as_string {
     my $self = shift;
-    my $heredoc_style = defined $self->_attr('heredoc_style') ?
-        $self->_attr('heredoc_style') : $heredoc_style,
-    my $keep_comments = defined $self->_attr('keep_comments') ?
-        $self->_attr('keep_comments') : $keep_comments,
+    my $heredoc_style = $self->heredoc_style();
+    my $keep_comments = $self->keep_comments();
 
     my $output = '';
 
@@ -832,7 +843,7 @@ single quotes must be escaped by doubling them, e.g.,
  $name = $ini->get( section => 'name' );
  # $name eq "The 'ties' that 'bind.'"
 
-This uses C<$Config::Ini::Quote::parse_single_quoted()>.
+This uses C<Config::Ini::Quote::parse_single_quoted()>.
 
 Double-quoted values may be parsed a couple of different ways.  By
 default, backslash-escaped unprintable characters will be unescaped to
@@ -845,7 +856,7 @@ If the C<':html'> heredoc modifier is used (see Heredoc Modifiers
 below), then HTML entities will be decoded (using HTML::Entities) to
 their actual Unicode characters.
 
-This uses C<$Config::Ini::Quote::parse_double_quoted()>.
+This uses C<Config::Ini::Quote::parse_double_quoted()>.
 
 See Config::Ini:Quote for more details.
 
@@ -1147,13 +1158,16 @@ C<init()> with the same parameters described above.
 
 By default, if you give a filename or string, the module will open it
 using ":encoding(utf8)".  You can change this by setting
-$Config::Ini::Edit::Encoding, e.g.,
+$Config::Ini::Edit::encoding, e.g.,
 
- $Config::Ini::Edit::Encoding = "iso-8859-1";
+ $Config::Ini::Edit::encoding = "iso-8859-1";
  my $ini = Config::Ini::Edit->new( file => 'filename' );
 
 Alternatively, you may open the file yourself using the desired
 encoding and send the filehandle to new() (or init());
+
+Set this to a false value, e.g., C<''> or C<0> to keep the
+module from specifying any encoding.
 
 =head3 init()
 

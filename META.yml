@@ -1,7 +1,7 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Config-Ini-Edit
-version:      1.01
+version:      1.03
 version_from: lib/Config/Ini/Edit.pm
 installdirs:  site
 requires:

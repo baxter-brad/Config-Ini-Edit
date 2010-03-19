@@ -28,7 +28,7 @@ Config::Ini::Edit - Ini configuration file reader and writer
 }}}
 
 !VERSION
-VERSION: 1.02
+VERSION: 1.03
 
 !DESCRIPTION
 This is an Ini configuration file processor. This class inherits from Config::Ini. It uses that module as well as Config::Ini::Quote, Text::~ParseWords and JSON;
@@ -162,13 +162,13 @@ Single-quoted values will be parsed literally, except that imbedded single quote
  # $name eq "The 'ties' that 'bind.'"
 }}}
 
-This uses {{{$Config::Ini::Quote::parse_single_quoted()}}}.
+This uses {{{Config::Ini::Quote::parse_single_quoted()}}}.
 
 Double-quoted values may be parsed a couple of different ways. By default, backslash-escaped unprintable characters will be unescaped to their actual Unicode character. This includes ascii control characters like {{{\n}}}, {{{\t}}}, etc., Unicode character codes like {{{\N}}} (Unicode next line), {{{\P}}} (Unicode paragraph separator), and hex-value escape sequences like {{{\x86}}} and {{{\u263A}}}.
 
 If the {{{':html'}}} heredoc modifier is used (see Heredoc Modifiers below), then HTML entities will be decoded (using HTML::Entities) to their actual Unicode characters.
 
-This uses {{{$Config::Ini::Quote::parse_double_quoted()}}}.
+This uses {{{Config::Ini::Quote::parse_double_quoted()}}}.
 
 See Config::Ini:Quote for more details.
 
@@ -450,14 +450,16 @@ Other parameters are {{{'keep_comments'}}} and {{{'heredoc_style'}}} to override
 
 If you do not pass any parameters to {{{new()}}}, you can later call {{{init()}}} with the same parameters described above.
 
-By default, if you give a filename or string, the module will open it using ":encoding(utf8)". You can change this by setting $Config::Ini::Edit::Encoding, e.g.,
+By default, if you give a filename or string, the module will open it using ":encoding(utf8)". You can change this by setting $Config::Ini::Edit::encoding, e.g.,
 
 {{{
- $Config::Ini::Edit::Encoding = "iso-8859-1";
+ $Config::Ini::Edit::encoding = "iso-8859-1";
  my $ini = Config::Ini::Edit->new( file => 'filename' );
 }}}
 
 Alternatively, you may open the file yourself using the desired encoding and send the filehandle to new() (or init());
+
+Set this to a false value, e.g., {{{''}}} or {{{0}}} to keep the module from specifying any encoding.
 
 !!!init()
 Calling options:
