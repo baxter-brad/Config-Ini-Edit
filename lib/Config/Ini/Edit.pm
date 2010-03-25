@@ -63,9 +63,9 @@ $JSON::Pretty  = 1;
 $JSON::BareKey = 1;  # *accepts* bare keys
 $JSON::KeySort = 1;
 
-our $encoding      = 'utf8'; # for new()/init()
-our $keep_comments = 1;      # boolean, user may set to 0
-our $heredoc_style = '<<';   # for as_string()
+our $encoding      = '';    # for new()/init()
+our $keep_comments = 1;     # boolean, user may set to 0
+our $heredoc_style = '<<';  # for as_string()
 
 use constant SECTIONS => 0;
 use constant SHASH    => 1;
@@ -576,7 +576,7 @@ sub vattr {
 ## file( 'filename' )
 ## keep_comments( 1 )
 ## heredoc_style( '<<' )
-## encoding( 'utf8' )
+## encoding( '' )
 
 our $AUTOLOAD;
 sub AUTOLOAD {
@@ -1156,18 +1156,19 @@ C<'{}'>.
 If you do not pass any parameters to C<new()>, you can later call
 C<init()> with the same parameters described above.
 
-By default, if you give a filename or string, the module will open it
-using ":encoding(utf8)".  You can change this by setting
-$Config::Ini::Edit::encoding, e.g.,
+By default, if you give a filename or string, the module will not
+specify any encoding, and thus will rely on perl's default behavior.
+You can change this by setting $Config::Ini::encoding, e.g.,
 
- $Config::Ini::Edit::encoding = "iso-8859-1";
- my $ini = Config::Ini::Edit->new( file => 'filename' );
+ $Config::Ini::encoding = "utf8";
+ my $ini = Config::Ini->new( file => 'filename' );
 
 Alternatively, you may open the file yourself using the desired
 encoding and send the filehandle to new() (or init());
 
 Set this to a false value, e.g., C<''> or C<0> to keep the
-module from specifying any encoding.
+module from specifying any encoding, i.e., to return to the
+default behavior.
 
 =head3 init()
 
