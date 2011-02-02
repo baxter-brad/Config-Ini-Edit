@@ -28,7 +28,7 @@ Config::Ini::Edit - Ini configuration file reader and writer
 }}}
 
 !VERSION
-VERSION: 1.03
+VERSION: 1.04
 
 !DESCRIPTION
 This is an Ini configuration file processor. This class inherits from Config::Ini. It uses that module as well as Config::Ini::Quote, Text::~ParseWords and JSON;
@@ -951,7 +951,7 @@ Config::Ini, Config::Ini::Quote, Config::Ini::Expanded, Config::~IniFiles, Confi
 Brad Baxter, <bmb@mail.libs.uga.edu>
 
 !COPYRIGHT AND LICENSE
-Copyright (C) 2010 by Brad Baxter
+Copyright (C) 2011 by Brad Baxter
 
 This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself, either Perl version 5.8.7 or, at your option, any later version of Perl 5 you may have available.
 

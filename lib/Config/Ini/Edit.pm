@@ -46,13 +46,13 @@ Config::Ini::Edit - Ini configuration file reader and writer
 
 =head1 VERSION
 
-VERSION: 1.03
+VERSION: 1.04
 
 =cut
 
 # more POD follows the __END__
 
-our $VERSION = '1.03';
+our $VERSION = '1.04';
 
 our @ISA = qw( Config::Ini );
 use Config::Ini;
@@ -213,7 +213,12 @@ sub init {
         }
 
         # [section]
-        if( /^\[([^\]]*)\](\s*[#;].*\s*)?/ ) {
+
+        # (excluding {} because of Config::Ini::Expanded's
+        # expansion syntax {INI:section:name} -- if section
+        # contains {}, it's confusing for the code)
+
+        if( /^\[([^{}\]]*)\](\s*[#;].*\s*)?/ ) {
             $section = $1;
             my $comment = $2;
             $self->_autovivify( $section );
@@ -230,7 +235,7 @@ sub init {
         # Note: name = {xyz} <<xyz>> must not be seen as a heredoc
         elsif(
             /^\s*($requoted)(\s*[=:]\s*)(<<|{)\s*([^}>]*?)\s*$/ or
-            /^\s*(.+?)(\s*[=:]\s*)(<<|{)\s*([^}>]*?)\s*$/ ) {
+            /^\s*([^=:]+?)(\s*[=:]\s*)(<<|{)\s*([^}>]*?)\s*$/ ) {
             $name       = $1;
             $vattr{'equals'} = $2;
             my $style   = $3;
@@ -314,7 +319,7 @@ sub init {
         }
 
         # name = value
-        elsif( /^\s*(.+?)(\s*[=:]\s*)(.*)$/ ) {
+        elsif( /^\s*([^=:]+?)(\s*[=:]\s*)(.*)$/ ) {
             $name = $1;
             $vattr{'equals'} = $2;
             $value = $3;
@@ -1674,7 +1679,7 @@ Brad Baxter, E<lt>bmb@mail.libs.uga.eduE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2010 by Brad Baxter
+Copyright (C) 2011 by Brad Baxter
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.7 or,

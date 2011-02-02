@@ -1,5 +1,8 @@
 Revision history for Perl extension Config::Ini::Edit.
 
+1.04 Wed Feb  2 15:23:00 EST 2011
+    - changed .+ to [^=:]+ for parsing name=value; fixed heredoc bug
+
 1.03 Fri Mar 19 14:34:53 EDT 2010
     - changed $Config::Ini::Encoding to $Config::Ini::encoding
     - added encoding() accessor
