@@ -1,5 +1,8 @@
 Revision history for Perl extension Config::Ini::Edit.
 
+1.05 Tue May  3 09:26:28 EDT 2011
+    - for JSON 2.51: changed jsonToObj to from_json and objToJson to to_json
+
 1.04 Wed Feb  2 15:23:00 EST 2011
     - changed .+ to [^=:]+ for parsing name=value; fixed heredoc bug
 

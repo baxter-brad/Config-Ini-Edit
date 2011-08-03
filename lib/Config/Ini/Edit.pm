@@ -46,22 +46,19 @@ Config::Ini::Edit - Ini configuration file reader and writer
 
 =head1 VERSION
 
-VERSION: 1.04
+VERSION: 1.05
 
 =cut
 
 # more POD follows the __END__
 
-our $VERSION = '1.04';
+our $VERSION = '1.05';
 
 our @ISA = qw( Config::Ini );
 use Config::Ini;
 use Config::Ini::Quote ':all';
 use Text::ParseWords;
 use JSON;
-$JSON::Pretty  = 1;
-$JSON::BareKey = 1;  # *accepts* bare keys
-$JSON::KeySort = 1;
 
 our $encoding      = '';    # for new()/init()
 our $keep_comments = 1;     # boolean, user may set to 0
@@ -367,8 +364,19 @@ sub init {
                 parse_line( $parse, 0, $value ) );
         }
         else {
-            $value = jsonToObj $value if $json;
+            # 'decode' is 'from json text to perl ref'
+
+            # it is expected that the $value has already
+            # been Encode::decode'd into perl's internal
+            # character encoding (i.e., utf8), and that
+            # this is what JSON::decode is expecting
+
+            if( $json ) {
+                my $jobj = JSON::->new;
+                $value = $jobj->decode( $value );
+            }
             $self->add( $section, $name, $value );
+            #XXX does this need to be outside the block? (it is in Config::Ini::Expanded)
             $self->vattr( $section, $name, $i{ $section }{ $name },
                 %vattr ) if %vattr;
         }
@@ -667,8 +675,12 @@ sub as_string {
                     ( $value =~ /\n/ and $q !~ /^("|d)/ );
 
                 if( $need_heredoc ) {
-                    # append "\n" here to avoid :chomp ...
-                    $value = objToJson($value)."\n" if $json;
+
+                    # 'encode' is 'from perl ref to json text'
+                    if( $json ) {
+                        my $jobj = JSON::->new->pretty->canonical;
+                        $value = $jobj->encode( $value );
+                    }
                     $output .= "$name$equals" .
                         as_heredoc(
                             value     => $value,
@@ -999,12 +1011,11 @@ if needed.
  name = Hillary and Bill
 
  name = <<:json
- { a: 1, b: 2, c: 3 }
+ { "a": 1, "b": 2, "c": 3 }
  <<
 
 Given the above C<':json'> example, C<< $ini->get( 'name' ) >> should
-return a hashref.  Note that we accept bare hash keys
-(C<$JSON::BareKey=1;>).
+return a hashref.  Note that we NO LONGER accept bare hash keys.
 
 As illustrated above, the enclosing C<'/'> characters around the
 regular expression are optional.  You may also use matching quotes
@@ -1015,7 +1026,7 @@ If there is a heredoc tag, e.g., C<'EOT'> below, the modifiers should
 follow it, too.
 
  name = <<EOT:json
- { a: 1, b: 2, c: 3 }
+ { "a": 1, "b": 2, "c": 3 }
  EOT
 
 If you want to use single or double quotes, surround the heredoc tag
