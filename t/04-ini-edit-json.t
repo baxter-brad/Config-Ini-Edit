@@ -10,8 +10,20 @@ my $data = do{ local $/; <DATA> };
 
 my $ini = Config::Ini::Edit->new( string => $data );
 my $obj = $ini->get( section => 'name' );
-my $jobj = JSON::->new->pretty->canonical;
-my $string = $jobj->encode( $obj );
+
+my $string;
+if( $JSON::VERSION < 2 ) {
+    $JSON::Pretty  = 1;
+    $JSON::KeySort = 1;
+    $JSON::Indent  = 3;
+
+    $string = objToJson($obj)."\n";
+}
+else {
+    my $jobj = JSON::->new->pretty->canonical;
+    $string = $jobj->encode( $obj );
+}
+
 is( $string, <<'__', 'json ('.__LINE__.')' );
 {
    "a" : 1,

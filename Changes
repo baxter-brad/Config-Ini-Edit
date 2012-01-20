@@ -1,5 +1,8 @@
 Revision history for Perl extension Config::Ini::Edit.
 
+1.06 Fri Jan 20 11:23:15 EST 2012
+    - allow for both JSON version 1.xx and verssion 2.xx
+
 1.05 Tue May  3 09:26:28 EDT 2011
     - for JSON 2.51: changed jsonToObj to from_json and objToJson to to_json
 

@@ -6,7 +6,7 @@ WriteMakefile(
     NAME              => 'Config::Ini::Edit',
     VERSION_FROM      => 'lib/Config/Ini/Edit.pm', # finds $VERSION
     PREREQ_PM         => {
-        'JSON'               => 2.51,
+        'JSON'               => 1.00,
         'Config::Ini'        => 1.04,
         'Config::Ini::Quote' => 1.01,
     }, # e.g., Module::Name => 1.1

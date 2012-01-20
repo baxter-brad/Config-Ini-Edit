@@ -46,13 +46,13 @@ Config::Ini::Edit - Ini configuration file reader and writer
 
 =head1 VERSION
 
-VERSION: 1.05
+VERSION: 1.06
 
 =cut
 
 # more POD follows the __END__
 
-our $VERSION = '1.05';
+our $VERSION = '1.06';
 
 our @ISA = qw( Config::Ini );
 use Config::Ini;
@@ -372,8 +372,14 @@ sub init {
             # this is what JSON::decode is expecting
 
             if( $json ) {
-                my $jobj = JSON::->new;
-                $value = $jobj->decode( $value );
+                if( $JSON::VERSION < 2 ) {
+                    $JSON::BareKey = 1;  # *accepts* bare keys
+                    $value = jsonToObj $value;
+                }
+                else {
+                    my $jobj = JSON::->new;
+                    $value = $jobj->decode( $value );
+                }
             }
             $self->add( $section, $name, $value );
             #XXX does this need to be outside the block? (it is in Config::Ini::Expanded)
@@ -678,8 +684,18 @@ sub as_string {
 
                     # 'encode' is 'from perl ref to json text'
                     if( $json ) {
-                        my $jobj = JSON::->new->pretty->canonical;
-                        $value = $jobj->encode( $value );
+                        if( $JSON::VERSION < 2 ) {
+                            $JSON::Pretty  = 1;
+                            $JSON::KeySort = 1;
+                            $JSON::Indent  = 3;
+
+                            # append "\n" here to avoid :chomp ...
+                            $value = objToJson($value)."\n";
+                        }
+                        else {
+                            my $jobj = JSON::->new->pretty->canonical;
+                            $value = $jobj->encode( $value );
+                        }
                     }
                     $output .= "$name$equals" .
                         as_heredoc(
