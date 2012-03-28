@@ -2,15 +2,46 @@
 use warnings;
 use strict;
 
-use Test::More tests => 12;
+use Test::More tests => 14;
 use Config::Ini::Edit;
 
-my $ini_data = do{ local $/; <DATA> };
+#---------------------------------------------------------------------
+# general tests for null section values
 
-Null_section: {
+GROUP1: {
 
-    my $data = $ini_data;
+    my $ini_data = <<_end_;
+# "null section"
+a
+a = alpha
+b = baker
+; "still null section"
+c : charlie
+d : dog
+[section1]
+c = charlie
+d = dog
+[] # null section again
+e = echo
+_end_
+
+    my $expect = <<_end_; # almost the same as $ini_data
+# "null section"
+a
+a = alpha
+b = baker
+; "still null section"
+c : charlie
+d : dog
+e = echo
+
+[section1]
+c = charlie
+d = dog
+_end_
+
     my $ini = Config::Ini::Edit->new( string => $ini_data );
+    is( $ini->as_string(), $expect, "as_string(), null sections" );
 
     # get(?)
     is( $ini->get( 'a' ), "1 alpha", "get(), null section" );
@@ -30,20 +61,30 @@ Null_section: {
     my @explicit = $ini->get_names( '' );
     my @implicit = $ini->get_names();
     is( "@explicit", 'a b c d e', "get_names(), null section" );
-    is( "@explicit", 'a b c d e', "get_names(), null section" );
+    is( "@implicit", 'a b c d e', "get_names(), null section" );
+   
 }
 
-__DATA__
-# "null section"
+#---------------------------------------------------------------------
+# specifically test that as_string() outputs null sections after a
+# non-null section
+
+GROUP2: {
+    my $ini_data = <<_end_;
+[section]
+c = charlie
+d = dog
+
+[]
 a
 a = alpha
 b = baker
-; "still null section"
 c : charlie
 d : dog
-[section1]
-c = charlie
-d = dog
-[] # null section again
 e = echo
+_end_
 
+    my $ini = Config::Ini::Edit->new( string => $ini_data );
+    is( $ini->as_string(), $ini_data, "as_string(), null sections" );
+
+}

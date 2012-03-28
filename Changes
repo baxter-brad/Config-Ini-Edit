@@ -1,5 +1,9 @@
 Revision history for Perl extension Config::Ini::Edit.
 
+1.07 Wed Mar 28 15:20:37 EDT 2012
+    - fix [] bug in as_string() (wasn't printing null sections after the first non-null)
+    - fix how as_string() prints out bare words
+
 1.06 Fri Jan 20 11:23:15 EST 2012
     - allow for both JSON version 1.xx and verssion 2.xx
 

@@ -46,13 +46,13 @@ Config::Ini::Edit - Ini configuration file reader and writer
 
 =head1 VERSION
 
-VERSION: 1.06
+VERSION: 1.07
 
 =cut
 
 # more POD follows the __END__
 
-our $VERSION = '1.06';
+our $VERSION = '1.07';
 
 our @ISA = qw( Config::Ini );
 use Config::Ini;
@@ -232,7 +232,8 @@ sub init {
         # Note: name = {xyz} <<xyz>> must not be seen as a heredoc
         elsif(
             /^\s*($requoted)(\s*[=:]\s*)(<<|{)\s*([^}>]*?)\s*$/ or
-            /^\s*([^=:]+?)(\s*[=:]\s*)(<<|{)\s*([^}>]*?)\s*$/ ) {
+            /^\s*([^=:]+?)(\s*[=:]\s*)(<<|{)\s*([^}>]*?)\s*$/ )
+        {
             $name       = $1;
             $vattr{'equals'} = $2;
             my $style   = $3;
@@ -359,9 +360,14 @@ sub init {
         if( $parse ne '' ) {
             $parse = $quote->( $parse, $1 )
                 if $parse =~ m,^(['"/]).*\1$,;
-            $self->add( $section, $name,
-                map { (defined $_) ? $_ : '' }
-                parse_line( $parse, 0, $value ) );
+            my $i = $i{ $section }{ $name };
+            for my $val ( parse_line( $parse, 0, $value ) ) {
+                $val = '' unless defined $val;
+                $self->add( $section, $name, $val );
+                $self->vattr( $section, $name, $i++,
+                    %vattr ) if %vattr;
+            }
+            $i{ $section }{ $name } += $i - 1;
         }
         else {
             # 'decode' is 'from json text to perl ref'
@@ -382,12 +388,9 @@ sub init {
                 }
             }
             $self->add( $section, $name, $value );
-            #XXX does this need to be outside the block? (it is in Config::Ini::Expanded)
             $self->vattr( $section, $name, $i{ $section }{ $name },
                 %vattr ) if %vattr;
         }
-
-        %vattr = ();
 
         if( $pending_comments ) {
             $self->set_comments( $section, $name,
@@ -396,6 +399,7 @@ sub init {
         }
 
         $i{ $section }{ $name }++;
+        %vattr = ();
 
     }  # while
 
@@ -407,6 +411,7 @@ sub init {
 
 #---------------------------------------------------------------------
 ## $ini->get_sections( $all )
+
 sub get_sections {
     my ( $self, $all ) = @_;
 
@@ -611,7 +616,8 @@ sub AUTOLOAD {
 sub DESTROY {}
 
 #---------------------------------------------------------------------
-## $ini->as_string()
+# $ini->as_string()
+
 sub as_string {
     my $self = shift;
     my $heredoc_style = $self->heredoc_style();
@@ -620,7 +626,9 @@ sub as_string {
     my $output = '';
 
     my @sections = $self->get_sections( 'all' );
-    foreach my $section ( @sections ) {
+    foreach my $i ( 0 .. $#sections ) {
+
+        my $section = $sections[ $i ];
 
         if( $keep_comments and defined( my $comments =
                 $self->get_section_comments( $section ) ) ) {
@@ -631,7 +639,7 @@ sub as_string {
             $output .= "\n" if $output;
         }
 
-        unless( $section eq '' or $section eq '__END__' ) {
+        unless( ($section eq '' && $i == 0) or $section eq '__END__' ) {
             $output .= "[$section]";
             if( $keep_comments and defined( my $comment =
                     $self->get_section_comment( $section ) ) ) {
@@ -659,7 +667,7 @@ sub as_string {
                 my $indented = $vattr{'indented'}  ||'';
                 my $extra    = $vattr{'extra'}     ||'';
                 my $json     = $vattr{'json'}      ||'';
-                my $equals   = $vattr{'equals'}    ||' = ';
+                my $equals   = $vattr{'equals'}    ||'';
                 my $q        = $vattr{'quote'}     ||'';
                 my $nq       = $vattr{'nquote'}    ||'';
                 my $comment  = $vattr{'comment'}   ||'';
@@ -697,7 +705,7 @@ sub as_string {
                             $value = $jobj->encode( $value );
                         }
                     }
-                    $output .= "$name$equals" .
+                    $output .= "$name$equals" .  # expect $equals to be non-null
                         as_heredoc(
                             value     => $value,
                             heretag   => $tag,
@@ -716,12 +724,21 @@ sub as_string {
                     # value has a comment attribute
                     my $need_quotes =
                         $q ? $q : $comment ? "'" : '';
-                    $output .= "$name$equals" . (
-                        $need_quotes eq '"'                          ?
-                            as_double_quoted( $value, '"', $escape ) :
-                        $need_quotes                                 ?
-                            as_single_quoted( $value, "'" )          :
-                        $value );
+
+                    if( $equals ) {
+                        $output .= "$name$equals" . (
+                            $need_quotes eq '"'                          ?
+                                as_double_quoted( $value, '"', $escape ) :
+                            $need_quotes                                 ?
+                                as_single_quoted( $value, "'" )          :
+                            $value );
+                    }
+
+                    else {  # bare word
+                        croak "Not a bare word? ($name = $value)" unless $value eq '1';
+                        $output .= $name;
+                    }
+
                     $output .= "$comment\n";
                 }
                 $i++;
